@@ -1,0 +1,44 @@
+# gaeta: OpenCode-safe wrapper
+
+This document pack is for building **gaeta** as an OpenCode-safe wrapper with phase-driven, methodology-enforced workflow control.
+
+The target model is:
+- `~/.config/gaeta/` is the source of truth.
+- `gaeta` projects its configuration into the paths OpenCode already understands, primarily `~/.config/opencode/`.
+- The wrapper preserves OpenCode compatibility instead of forking its internals.
+- Sandbox, policy, modes, agents, commands, plugins, and workflow conventions live under the gaeta namespace.
+
+The goal is not "replace OpenCode".
+The goal is "compose a stricter, more opinionated operator layer around OpenCode".
+
+## Deliverables in this pack
+
+- `docs/architecture.md` — system design, boundaries, config mapping, runtime model.
+- `docs/implementation-plan.md` — phased build plan.
+- `docs/decisions.md` — ADR-style decision log.
+- `docs/.gaeta/checklist.md` — Markdown checkbox workflow for task tracking.
+- `docs/.gaeta/phases.md` — phase definitions and exit criteria.
+- `docs/.gaeta/status.md` — living project status file.
+- `docs/.gaeta/backlog.md` — queued work.
+- `AGENTS.md` — behavioral rules for OpenCode/gaeta to keep docs updated.
+
+## Design principles
+
+- Reuse OpenCode primitives before inventing gaeta-specific ones.
+- Keep the wrapper thin; keep policy explicit.
+- Prefer compatibility shims over patches to upstream internals.
+- Separate sandbox concerns from workflow concerns.
+- Separate config source-of-truth from config projection.
+- Make phase/state/checklist updates mandatory by convention.
+- Treat documentation as an executable control surface for vibe-coding.
+
+## What this assumes from current wrapper lineage
+
+The current wrapper already proves the core direction:
+- Bubblewrap sandboxing is the primary isolation layer.
+- Landlock via `landrun` is optional defense-in-depth.
+- `~/.config/gaeta/gaeta.json` should take precedence over `~/.config/opencode/opencode.json`.
+- Metadata already exists conceptually via phase/session/approval logs.
+- The wrapper already binds a synthetic home and overlays OpenCode config into sandbox-visible paths.
+
+This documentation turns that into a fuller product plan.
