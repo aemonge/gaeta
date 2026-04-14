@@ -10,6 +10,7 @@
 - [ ] Implement projection for `agents/`, `commands/`, `modes/`, and `plugins/`.
 - [ ] Add methodology-enforced agent instructions per phase.
 - [ ] Add checklist/status sync behavior for gaeta workflow files.
+- [ ] Add `gaeta tasks` command flow using `mdt` with graceful fallback.
 - [ ] Add approval-gated self-update proposal flow.
 - [ ] Add backup snapshot command/script for hard saves.
 
@@ -26,3 +27,5 @@
 - [x] Establish wrapper-over-OpenCode direction (not a fork).
 - [x] Establish Markdown checkbox files as the task system.
 - [x] Archive legacy root/reference material under `docs/references/` and add ignore rules for local runtime artifacts.
+- [x] Document `mdt` as preferred task operator with graceful fallback requirement.
+- [x] Document `sem` as preferred semantic diff dependency with fallback to `git diff`.

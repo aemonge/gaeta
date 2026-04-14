@@ -11,6 +11,19 @@ The target model is:
 The goal is not "replace OpenCode".
 The goal is "compose a stricter, more opinionated operator layer around OpenCode".
 
+## Task tooling
+
+- Canonical task state lives in `docs/.gaeta/checklist.md`.
+- Preferred external task operator is `mdt` (Markdown todo CLI).
+- gaeta must provide graceful fallback behavior when `mdt` is unavailable.
+- Internal agent planning can use background task helpers, but repository truth remains Markdown files under `docs/.gaeta/`.
+
+## Diff tooling
+
+- Preferred semantic diff tool is `sem` for clearer review of meaningful changes.
+- Reference: `https://ataraxy-labs.github.io/sem/`.
+- gaeta should use `sem` when available and gracefully fall back to standard `git diff` when it is not installed.
+
 ## Deliverables in this pack
 
 - `docs/architecture.md` — system design, boundaries, config mapping, runtime model.

@@ -9,7 +9,7 @@
 
 ## Next Step
 
-Document `mdt` integration + fallback behavior, then implement minimal `gaeta.json` -> `opencode.json` projection output.
+Implement `gaeta tasks` around `mdt` with graceful fallback, then implement minimal `gaeta.json` -> `opencode.json` projection output.
 
 ## Blockers
 

@@ -23,7 +23,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Implement generated `opencode.json` projection from `gaeta.json`.
 - Implement directory projection for agents/commands/modes/plugins.
 - Define commit-sized implementation slices with human checkpoints.
-- Integrate `mdt` as preferred markdown task operator with graceful fallback behavior.
+- Implement `gaeta tasks` flow with `mdt` + graceful fallback.
 
 ## Blockers
 
@@ -34,7 +34,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Document `mdt` tool decision and fallback behavior in gaeta docs, then implement minimal projection output (`gaeta.json` -> generated `opencode.json`) with `projection.json` metadata.
+Implement `gaeta tasks` command behavior around `mdt` with graceful fallback, then continue minimal projection output (`gaeta.json` -> generated `opencode.json`) with `projection.json` metadata.
 
 ## Decisions
 
@@ -44,3 +44,5 @@ Document `mdt` tool decision and fallback behavior in gaeta docs, then implement
 - Markdown checklists are the workflow task system.
 - Self-updating behavior is approval-gated only.
 - `mdt` is the preferred external checklist operator; gaeta must provide graceful fallback when unavailable.
+- The `mdt` decision and fallback requirement are now documented in top-level gaeta docs.
+- `sem` is the preferred semantic diff dependency; gaeta should fall back to `git diff` if unavailable.

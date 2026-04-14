@@ -9,6 +9,18 @@ gaeta is an OpenCode-safe wrapper that adds:
 - documentation-first project memory,
 - approval-gated self-updating behavior.
 
+## Task Operations
+
+- Canonical task truth: `docs/.gaeta/checklist.md`.
+- Preferred external operator: `mdt`.
+- Required behavior: graceful fallback when `mdt` is not installed.
+- Internal planning helpers do not replace Markdown source-of-truth files.
+
+## Review Operations
+
+- Preferred semantic diff operator: `sem`.
+- If `sem` is unavailable, use standard `git diff` as fallback.
+
 ## Operator Rules
 
 Before meaningful work:
