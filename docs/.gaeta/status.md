@@ -16,12 +16,14 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Config precedence now prefers `~/.config/gaeta/gaeta.json`, with fallback to `~/.config/scoder/scoder.json` and then OpenCode default config.
 - Runtime metadata is now written under `./.gaeta/` (`phase`, `command.json`, `session.log`, `approval.log`).
 - Repo docs were previously split/inconsistent; canonical workflow location is now `docs/.gaeta/`.
+- Legacy root/reference files were archived under `docs/references/` to reduce root noise.
 
 ## In progress
 
 - Implement generated `opencode.json` projection from `gaeta.json`.
 - Implement directory projection for agents/commands/modes/plugins.
 - Define commit-sized implementation slices with human checkpoints.
+- Integrate `mdt` as preferred markdown task operator with graceful fallback behavior.
 
 ## Blockers
 
@@ -32,7 +34,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Implement minimal projection output (`gaeta.json` -> generated `opencode.json`) and write `projection.json` metadata.
+Document `mdt` tool decision and fallback behavior in gaeta docs, then implement minimal projection output (`gaeta.json` -> generated `opencode.json`) with `projection.json` metadata.
 
 ## Decisions
 
@@ -41,3 +43,4 @@ Implement minimal projection output (`gaeta.json` -> generated `opencode.json`) 
 - `docs/.gaeta/` is the canonical repository workflow control plane.
 - Markdown checklists are the workflow task system.
 - Self-updating behavior is approval-gated only.
+- `mdt` is the preferred external checklist operator; gaeta must provide graceful fallback when unavailable.

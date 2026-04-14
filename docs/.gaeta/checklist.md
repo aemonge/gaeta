@@ -25,3 +25,4 @@
 
 - [x] Establish wrapper-over-OpenCode direction (not a fork).
 - [x] Establish Markdown checkbox files as the task system.
+- [x] Archive legacy root/reference material under `docs/references/` and add ignore rules for local runtime artifacts.

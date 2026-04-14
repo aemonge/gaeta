@@ -5,11 +5,11 @@
 - Name: gaeta
 - Direction: OpenCode-safe wrapper with phase-driven, methodology-enforced agent workflow.
 - Current phase: Phase 0 -> Phase 1 handoff.
-- Current sprint: establish gaeta identity, canonical workflow files, and wrapper migration path.
+- Current sprint: projection contract + task tooling integration (`mdt` with fallback).
 
 ## Next Step
 
-Create `./gaeta` executable, then align config and metadata paths to gaeta namespaces.
+Document `mdt` integration + fallback behavior, then implement minimal `gaeta.json` -> `opencode.json` projection output.
 
 ## Blockers
 
