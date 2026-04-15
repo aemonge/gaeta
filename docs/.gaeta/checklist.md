@@ -18,7 +18,8 @@
 - [x] Set resume launcher defaults to OpenCode `--agent plan` and refine handoff prompt quality.
 - [x] Relax root `opencode.json` permission profile to reduce over-restrictive plan/build failures while keeping destructive command denies.
 - [ ] Add methodology-enforced agent instructions per phase.
-- [ ] Add checklist/status sync behavior for gaeta workflow files.
+- [x] Add checklist/status sync behavior for gaeta workflow files.
+- [x] Add `gaeta handoff` command plus project `/handoff` prompt template.
 - [x] Add `gaeta tasks` command flow using `mdt` with graceful fallback.
 - [ ] Add approval-gated self-update proposal flow.
 - [ ] Add backup snapshot command/script for hard saves.

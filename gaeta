@@ -29,12 +29,14 @@ Usage:
   gaeta doctor [PROJECT_DIR]
   gaeta resume [--show] [PROJECT_DIR]
   gaeta r [--show] [PROJECT_DIR]
+  gaeta handoff [PROJECT_DIR]
   gaeta tasks [TASK_ARGS...]
   gaeta [options] [PROJECT_DIR] [-- [OPENCODE_ARGS...]]
 
 Options:
   doctor                 Run gaeta self-inspection checks
   resume, r              Show phase/next-step resume context
+  handoff                Sync workflow docs and write handoff snapshot
   tasks                  Run task workflow via mdt (with fallback)
   -h, --help              Show this help and exit
   -V, --version           Show version and exit
@@ -126,6 +128,7 @@ Examples:
   gaeta resume --show      # show resolved resume command without launching
   GAETA_RESUME_AGENT=plan gaeta r --show # preview resume agent launch
   gaeta r                  # short alias for resume
+  gaeta handoff            # sync docs/.gaeta status + write handoff snapshot
   gaeta tasks              # run mdt in docs/.gaeta (or fallback view)
   gaeta tasks -m           # add multiple tasks via mdt
   gaeta                    # rw sandbox of $PWD, infra protected, paranoid if available
@@ -808,6 +811,11 @@ run_tasks_command() {
     local checklist_path="${gaeta_dir}/checklist.md"
     local status_path="${gaeta_dir}/status.md"
 
+    if [[ "${task_args[0]:-}" == "sync" ]]; then
+        sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-sync"
+        return $?
+    fi
+
     if [[ ! -d "${gaeta_dir}" ]]; then
         warning "docs/.gaeta not found in ${project_dir}; using fallback mode"
         run_tasks_fallback "${checklist_path}" "${status_path}" "${task_args[@]}"
@@ -834,6 +842,196 @@ run_tasks_command() {
     warning "mdt unavailable or fallback forced; using built-in fallback tasks mode"
     run_tasks_fallback "${checklist_path}" "${status_path}" "${task_args[@]}"
 }
+
+run_handoff_command() {
+    local target_project="${PWD}"
+    local -a handoff_positionals=()
+
+    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+        cat <<'HANDOFF_HELP'
+Usage:
+  gaeta handoff [PROJECT_DIR]
+
+Synchronizes workflow state and writes a handoff snapshot:
+  - sync docs/.gaeta/status.md from docs/.gaeta/checklist.md
+  - write docs/.gaeta/handoff.md
+  - sync PROJECT.md Next Step and Snapshot phase (when present)
+HANDOFF_HELP
+        return 0
+    fi
+
+    while [[ $# -gt 0 ]]; do
+        handoff_positionals+=("$1")
+        shift
+    done
+
+    if [[ ${#handoff_positionals[@]} -gt 1 ]]; then
+        error "handoff accepts at most one optional PROJECT_DIR"
+        return 1
+    fi
+
+    if [[ ${#handoff_positionals[@]} -eq 1 ]]; then
+        target_project="${handoff_positionals[0]}"
+    fi
+
+    if [[ ! -d "${target_project}" ]]; then
+        error "handoff project directory does not exist: ${target_project}"
+        return 1
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        error "python3 is required for handoff command"
+        return 1
+    fi
+
+    target_project="$(realpath "${target_project}")"
+
+    local gaeta_dir="${target_project}/docs/.gaeta"
+    local checklist_path="${gaeta_dir}/checklist.md"
+    local status_path="${gaeta_dir}/status.md"
+    local backlog_path="${gaeta_dir}/backlog.md"
+    local handoff_path="${gaeta_dir}/handoff.md"
+    local project_path="${target_project}/PROJECT.md"
+    local runtime_log="${target_project}/.gaeta/session.log"
+
+    if [[ ! -d "${gaeta_dir}" ]]; then
+        error "handoff requires docs/.gaeta in target project: ${target_project}"
+        return 1
+    fi
+
+    if ! sync_status_from_checklist "${checklist_path}" "${status_path}" "handoff"; then
+        return 1
+    fi
+
+    if ! python3 - "${checklist_path}" "${status_path}" "${backlog_path}" "${handoff_path}" "${project_path}" <<'PY'
+import datetime
+import pathlib
+import re
+import sys
+
+
+def section_body(text: str, heading: str) -> str:
+    pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.MULTILINE)
+    match = pattern.search(text)
+    if not match:
+        return ""
+    start = match.end()
+    remaining = text[start:]
+    next_heading = re.search(r"^##\s+", remaining, re.MULTILINE)
+    if next_heading:
+        return remaining[: next_heading.start()].strip()
+    return remaining.strip()
+
+
+def replace_or_append_section(text: str, heading: str, body: str) -> str:
+    header_pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.MULTILINE)
+    header_match = header_pattern.search(text)
+    section = f"## {heading}\n\n{body.strip()}\n"
+
+    if header_match is None:
+        base = text.rstrip()
+        if base:
+            return f"{base}\n\n{section}\n"
+        return f"{section}\n"
+
+    section_start = header_match.start()
+    content_start = header_match.end()
+    next_header = re.search(r"^##\s+", text[content_start:], re.MULTILINE)
+    if next_header is None:
+        return f"{text[:section_start].rstrip()}\n\n{section}\n"
+
+    section_end = content_start + next_header.start()
+    prefix = text[:section_start].rstrip()
+    suffix = text[section_end:].lstrip("\n")
+    if prefix:
+        return f"{prefix}\n\n{section}\n{suffix.rstrip()}\n"
+    return f"{section}\n{suffix.rstrip()}\n"
+
+
+checklist_path = pathlib.Path(sys.argv[1])
+status_path = pathlib.Path(sys.argv[2])
+backlog_path = pathlib.Path(sys.argv[3])
+handoff_path = pathlib.Path(sys.argv[4])
+project_path = pathlib.Path(sys.argv[5])
+
+status_text = status_path.read_text(encoding="utf-8") if status_path.exists() else ""
+checklist_text = checklist_path.read_text(encoding="utf-8") if checklist_path.exists() else ""
+backlog_text = backlog_path.read_text(encoding="utf-8") if backlog_path.exists() else ""
+
+phase_value = section_body(status_text, "Current phase") or "unknown"
+next_step_value = section_body(status_text, "Next step") or "(not defined)"
+blockers_value = section_body(status_text, "Blockers") or "- none"
+
+pending_sprint = []
+in_current_sprint = False
+for raw in checklist_text.splitlines():
+    line = raw.strip()
+    if line.startswith("## "):
+        in_current_sprint = line == "## Current Sprint"
+        continue
+    if in_current_sprint and line.startswith("- [ ] "):
+        pending_sprint.append(line[6:].strip())
+
+pending_backlog = []
+for raw in backlog_text.splitlines():
+    line = raw.strip()
+    if line.startswith("- [ ] "):
+        pending_backlog.append(line[6:].strip())
+
+if pending_sprint:
+    sprint_body = "\n".join(f"- {item}" for item in pending_sprint[:5])
+else:
+    sprint_body = "- none"
+
+if pending_backlog:
+    backlog_body = "\n".join(f"- {item}" for item in pending_backlog[:5])
+else:
+    backlog_body = "- none"
+
+timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+handoff_text = (
+    "# Handoff\n\n"
+    f"- Generated: {timestamp}\n"
+    "- Trigger: gaeta handoff\n\n"
+    "## Current phase\n\n"
+    f"{phase_value}\n\n"
+    "## Next step\n\n"
+    f"{next_step_value}\n\n"
+    "## Top pending sprint items\n\n"
+    f"{sprint_body}\n\n"
+    "## Blockers\n\n"
+    f"{blockers_value}\n\n"
+    "## Top backlog items\n\n"
+    f"{backlog_body}\n"
+)
+
+handoff_path.parent.mkdir(parents=True, exist_ok=True)
+handoff_path.write_text(handoff_text, encoding="utf-8")
+
+if project_path.exists():
+    project_text = project_path.read_text(encoding="utf-8")
+    lines = project_text.splitlines()
+    for idx, raw in enumerate(lines):
+        if raw.startswith("- Current phase:"):
+            lines[idx] = f"- Current phase: {phase_value}."
+    project_updated = "\n".join(lines)
+    project_updated = replace_or_append_section(project_updated, "Next Step", next_step_value)
+    project_path.write_text(project_updated if project_updated.endswith("\n") else project_updated + "\n", encoding="utf-8")
+
+print(f"wrote {handoff_path}")
+PY
+    then
+        error "failed to write handoff snapshot"
+        return 1
+    fi
+
+    mkdir -p "$(dirname "${runtime_log}")"
+    printf '[%s] handoff: synced status and wrote docs/.gaeta/handoff.md\n' "$(date -Iseconds)" >>"${runtime_log}"
+
+    info "handoff updated: ${status_path} and ${handoff_path}"
+    return 0
+}
+
 
 detect_file_source_mode() {
     local gaeta_file="$1"
@@ -2036,6 +2234,16 @@ if [[ "${1:-}" == "tasks" ]]; then
     fi
     exit 0
 fi
+
+# Command dispatch: gaeta handoff ...
+if [[ "${1:-}" == "handoff" ]]; then
+    shift
+    if ! run_handoff_command "$@"; then
+        exit 1
+    fi
+    exit 0
+fi
+
 
 # -------- option parsing --------
 RO_SET=0

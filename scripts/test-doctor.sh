@@ -143,3 +143,27 @@ assert projected_tui["keybinds"]["quit"] == "ctrl+q", projected_tui
 
 print("doctor json and config inheritance tests passed")
 PY
+
+HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
+HOME="$TEST_HOME" "$GAETA_BIN" handoff "$TEST_PROJECT"
+
+python3 - "$TEST_PROJECT" <<'PY'
+import pathlib
+import sys
+
+project = pathlib.Path(sys.argv[1])
+status_text = (project / "docs" / ".gaeta" / "status.md").read_text(encoding="utf-8")
+handoff_text = (project / "docs" / ".gaeta" / "handoff.md").read_text(encoding="utf-8")
+project_text = (project / "PROJECT.md").read_text(encoding="utf-8")
+session_log = (project / ".gaeta" / "session.log").read_text(encoding="utf-8")
+
+assert "## In progress" in status_text, status_text
+assert "Implement sync behavior." in status_text, status_text
+assert "Add methodology-enforced instructions." in status_text, status_text
+assert "# Handoff" in handoff_text, handoff_text
+assert "Phase X" in handoff_text, handoff_text
+assert "## Next Step" in project_text, project_text
+assert "handoff: synced status and wrote docs/.gaeta/handoff.md" in session_log, session_log
+
+print("tasks sync and handoff tests passed")
+PY

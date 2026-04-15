@@ -157,3 +157,49 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"gaeta resume"* ]]
 }
+
+@test "tasks sync works without mdt and updates status" {
+  run env HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
+  [ "$status" -eq 0 ]
+
+  run python3 - "$TEST_PROJECT" <<'PY'
+import pathlib
+import sys
+
+project = pathlib.Path(sys.argv[1])
+status_text = (project / "docs" / ".gaeta" / "status.md").read_text(encoding="utf-8")
+assert "## In progress" in status_text, status_text
+assert "- Implement sync behavior." in status_text, status_text
+assert "- Add methodology-enforced instructions." in status_text, status_text
+assert "## Next step" in status_text, status_text
+assert "Implement sync behavior." in status_text, status_text
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "handoff writes handoff snapshot and updates dashboard" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" handoff "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+
+  run python3 - "$TEST_PROJECT" <<'PY'
+import pathlib
+import sys
+
+project = pathlib.Path(sys.argv[1])
+handoff_text = (project / "docs" / ".gaeta" / "handoff.md").read_text(encoding="utf-8")
+project_text = (project / "PROJECT.md").read_text(encoding="utf-8")
+session_log = (project / ".gaeta" / "session.log").read_text(encoding="utf-8")
+
+assert "# Handoff" in handoff_text, handoff_text
+assert "## Current phase" in handoff_text, handoff_text
+assert "Phase X" in handoff_text, handoff_text
+assert "## Top pending sprint items" in handoff_text, handoff_text
+assert "Implement sync behavior." in handoff_text, handoff_text
+assert "Add methodology-enforced instructions." in handoff_text, handoff_text
+
+assert "## Next Step" in project_text, project_text
+assert "Implement sync behavior." in project_text, project_text
+assert "handoff: synced status and wrote docs/.gaeta/handoff.md" in session_log, session_log
+PY
+  [ "$status" -eq 0 ]
+}

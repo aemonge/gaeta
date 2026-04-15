@@ -9,11 +9,11 @@
 - Diagnostics: `gaeta doctor` (human) and `gaeta doctor --json` (machine-readable) available for self-inspection, with `make lint`/`make test` entrypoints.
 - Terminal UX: interactive runs default to compatibility redraw mode; strict TTY isolation is opt-in via `--strict-tty`.
 - Session continuity: `gaeta resume` (`gaeta r`) launches OpenCode with `--agent plan` and the documented resume prompt; use `--show` to preview command/prompt.
-- Runtime permissions: root `opencode.json` now uses a sensible ask-first policy with explicit destructive denies.
+- Runtime permissions: root `opencode.json` now uses an allow baseline for `read`/`edit`/`external_directory` plus explicit destructive bash denies.
 
 ## Next Step
 
-Implement checklist/status sync behavior for gaeta workflow files, then add methodology-enforced agent instructions per phase.
+Add methodology-enforced agent instructions per phase.
 
 ## Resume Prompt
 

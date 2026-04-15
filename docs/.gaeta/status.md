@@ -25,15 +25,18 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Interactive sessions now default to TTY compatibility mode (better resize/redraw behavior), with strict session isolation opt-in via `--strict-tty`.
 - `gaeta resume` (`gaeta r`) now launches a resumed gaeta session using OpenCode `--agent plan` plus a read-only handoff `--prompt`, with `--show` for dry-run visibility.
 - Operator resume prompt is recorded in `PROJECT.md` under `## Resume Prompt` for clean handoff into new gaeta sessions.
-- Root `opencode.json` permissions were relaxed to an `allow` baseline with explicit destructive denies to avoid non-persistent ask prompts in sandboxed sessions.
+- Root `opencode.json` permissions now use an explicit allow baseline for `read`, `edit`, and `external_directory` to prevent permission deadlocks in build workflows; destructive bash denies remain in place.
 - Repo docs were previously split/inconsistent; canonical workflow location is now `docs/.gaeta/`.
 - Legacy root/reference files were archived under `docs/references/` to reduce root noise.
+- `gaeta tasks sync` now uses an explicit built-in sync path so status updates work even when `mdt` is installed.
+- `gaeta handoff` now syncs `docs/.gaeta/status.md`, writes `docs/.gaeta/handoff.md`, updates `PROJECT.md` `## Next Step`, and appends a runtime handoff log entry.
+- Per-project OpenCode `/handoff` is now available via `.opencode/commands/handoff.md`.
 
 ## In progress
 
-- Define commit-sized implementation slices with human checkpoints.
-- Define checklist/status sync behavior for gaeta workflow files.
 - Add methodology-enforced agent instructions per phase.
+- Add approval-gated self-update proposal flow.
+- Add backup snapshot command/script for hard saves.
 
 ## Blockers
 
@@ -42,7 +45,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Implement checklist/status sync behavior for gaeta workflow files, then add methodology-enforced agent instructions per phase.
+Add methodology-enforced agent instructions per phase.
 
 ## Decisions
 
@@ -64,3 +67,5 @@ Implement checklist/status sync behavior for gaeta workflow files, then add meth
 - `mdt` is the preferred external checklist operator; gaeta must provide graceful fallback when unavailable.
 - The `mdt` decision and fallback requirement are now documented in top-level gaeta docs.
 - `sem` is the preferred semantic diff dependency; gaeta should fall back to `git diff` if unavailable.
+- Handoff updates are implemented as an explicit wrapper command (`gaeta handoff`) plus a per-project OpenCode slash-command template (`.opencode/commands/handoff.md`).
+- Updated root permission baseline to avoid build-agent deadlocks caused by overly narrow `external_directory`/`edit` patterns.
