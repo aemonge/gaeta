@@ -10,6 +10,9 @@
 - [x] Implement generated `opencode.json` projection from gaeta-managed config.
 - [x] Implement projection for `agents/`, `commands/`, `modes/`, and `plugins/`.
 - [x] Add `gaeta doctor` self-inspection command for config/projection/workflow health.
+- [x] Add `gaeta doctor --json` machine-readable output for validation/TDD workflows.
+- [x] Add `make lint` and `make test` entrypoints (doctor JSON + config inheritance validation).
+- [x] Improve `make lint`/`make test` UX with colored status output and explicit check markers.
 - [ ] Add methodology-enforced agent instructions per phase.
 - [ ] Add checklist/status sync behavior for gaeta workflow files.
 - [x] Add `gaeta tasks` command flow using `mdt` with graceful fallback.

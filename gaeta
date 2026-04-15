@@ -10,7 +10,8 @@ set -euo pipefail
 readonly PROGRAM_NAME="gaeta"
 readonly PROGRAM_VERSION="0.9.0"
 readonly OPENCODE_BIN_DEFAULT="/usr/bin/opencode"
-readonly GAETA_SELF_PATH="$(realpath "$0" 2>/dev/null || printf '%s' "$0")"
+GAETA_SELF_PATH="$(realpath "$0" 2>/dev/null || printf '%s' "$0")"
+readonly GAETA_SELF_PATH
 
 # Colors for output
 readonly RED='\033[0;31m'
@@ -72,6 +73,7 @@ Environment:
   GAETA_NET              "on" to enable network by default ("off" otherwise)
   GAETA_FS_MODE          "ro" (secure) or "rw" (default, allow writes)
   GAETA_TASKS_FORCE_FALLBACK  "1" to bypass mdt and use built-in tasks fallback
+  GAETA_DOCTOR_SKIP_SANDBOX   "1" to skip nested sandbox check in gaeta doctor
 
 Protected Directories (read-only by default):
   .git, .turbo, .next, dist, build, target, .cargo
@@ -112,6 +114,7 @@ Paranoid Mode (Defense-in-Depth):
 
 Examples:
   gaeta doctor             # inspect gaeta config and projection health
+  gaeta doctor --json      # inspect gaeta health as JSON
   gaeta doctor ../repo     # inspect another project
   gaeta tasks              # run mdt in docs/.gaeta (or fallback view)
   gaeta tasks -m           # add multiple tasks via mdt
@@ -140,7 +143,8 @@ version() {
     if command -v landrun >/dev/null 2>&1; then
         landrun_path=$(command -v landrun)
         if [[ -f /sys/kernel/security/landlock/version ]]; then
-            local abi_version=$(cat /sys/kernel/security/landlock/version 2>/dev/null || echo "0")
+            local abi_version
+            abi_version=$(cat /sys/kernel/security/landlock/version 2>/dev/null || echo "0")
             landlock_status="available (ABI v${abi_version})"
             paranoid_status="enabled by default"
         else
@@ -758,30 +762,133 @@ print_doctor_check() {
     local label="$1"
     local state="$2"
     local details="$3"
-    printf '  %-22s %-6s %s\n' "${label}" "[${state}]" "${details}"
+    local normalized_details="${details//$'\n'/ | }"
+    normalized_details="${normalized_details//$'\t'/ }"
+
+    if [[ "${DOCTOR_COLLECT:-0}" -eq 1 ]]; then
+        DOCTOR_CHECK_ROWS+=("${CURRENT_DOCTOR_SECTION}"$'\t'"${label}"$'\t'"${state}"$'\t'"${normalized_details}")
+    fi
+
+    if [[ "${DOCTOR_JSON:-0}" -ne 1 ]]; then
+        printf '  %-22s %-6s %s\n' "${label}" "[${state}]" "${normalized_details}"
+    fi
+}
+
+render_doctor_json() {
+    local target_project="$1"
+    local fail_count="$2"
+    local warn_count="$3"
+    local generated_at="$4"
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        error "python3 is required for --json output"
+        return 1
+    fi
+
+    local rows_file
+    rows_file="$(mktemp)"
+    printf '%s\n' "${DOCTOR_CHECK_ROWS[@]}" >"${rows_file}"
+
+    python3 - "${target_project}" "${fail_count}" "${warn_count}" "${generated_at}" "${rows_file}" <<'PY'
+import json
+import pathlib
+import sys
+
+project = sys.argv[1]
+fail_count = int(sys.argv[2])
+warn_count = int(sys.argv[3])
+generated_at = sys.argv[4]
+rows_file = pathlib.Path(sys.argv[5])
+
+section_key_map = {
+    "Dependencies": "dependencies",
+    "Config Sources": "config_sources",
+    "Directory Sources": "directory_sources",
+    "Projection Artifacts": "projection_artifacts",
+    "Sandbox Check": "sandbox_check",
+    "Workflow Files": "workflow_files",
+}
+
+checks = {value: [] for value in section_key_map.values()}
+
+for raw_line in rows_file.read_text(encoding="utf-8").splitlines():
+    line = raw_line.rstrip("\n")
+    if not line:
+        continue
+    parts = line.split("\t", 3)
+    if len(parts) != 4:
+        continue
+    section, label, status, details = parts
+    key = section_key_map.get(section)
+    if key is None:
+        continue
+    checks[key].append({
+        "label": label,
+        "status": status,
+        "details": details,
+    })
+
+status = "ok"
+if fail_count > 0:
+    status = "fail"
+elif warn_count > 0:
+    status = "warn"
+
+payload = {
+    "timestamp": generated_at,
+    "project": project,
+    "status": status,
+    "summary": {
+        "fail": fail_count,
+        "warn": warn_count,
+    },
+    "checks": checks,
+}
+
+print(json.dumps(payload, indent=2, ensure_ascii=True))
+PY
+
+    rm -f "${rows_file}"
 }
 
 run_doctor_command() {
     local target_project="${PWD}"
+    local doctor_json_flag=0
+    local -a doctor_positionals=()
 
     if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
         cat <<'DOCTOR_HELP'
 Usage:
-  gaeta doctor [PROJECT_DIR]
+  gaeta doctor [--json] [PROJECT_DIR]
 
 Runs gaeta self-inspection checks for dependencies, config source selection,
 projection artifacts, and workflow files.
+
+Options:
+  --json    Emit machine-readable JSON output
 DOCTOR_HELP
         return 0
     fi
 
-    if [[ $# -gt 1 ]]; then
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --json)
+            doctor_json_flag=1
+            ;;
+        *)
+            doctor_positionals+=("$1")
+            ;;
+        esac
+        shift
+    done
+
+    if [[ ${#doctor_positionals[@]} -gt 1 ]]; then
         error "doctor accepts at most one optional PROJECT_DIR"
         return 1
     fi
 
-    if [[ $# -eq 1 ]]; then
-        target_project="$1"
+    if [[ ${#doctor_positionals[@]} -eq 1 ]]; then
+        target_project="${doctor_positionals[0]}"
     fi
 
     if [[ ! -d "${target_project}" ]]; then
@@ -798,6 +905,13 @@ DOCTOR_HELP
 
     local fail_count=0
     local warn_count=0
+    local generated_at
+    generated_at="$(date -Iseconds)"
+
+    DOCTOR_JSON=${doctor_json_flag}
+    DOCTOR_COLLECT=1
+    CURRENT_DOCTOR_SECTION=""
+    local -a DOCTOR_CHECK_ROWS=()
 
     local opencode_bin_check="${OPENCODE_BIN:-${OPENCODE_BIN_DEFAULT}}"
     local gaeta_config_dir="${HOME}/.config/gaeta"
@@ -836,17 +950,25 @@ DOCTOR_HELP
 
     local projection_refresh_state="ok"
     local projection_refresh_details="refreshed projection artifacts"
+    local previous_quiet="${QUIET}"
+    QUIET=1
     if ! prepare_projection_artifacts; then
         projection_refresh_state="warn"
         projection_refresh_details="failed to refresh projection artifacts"
         ((warn_count += 1))
     fi
+    QUIET="${previous_quiet}"
 
-    printf 'gaeta doctor\n'
-    printf '  project: %s\n' "${target_project}"
-    printf '\n'
+    if [[ "${DOCTOR_JSON}" -ne 1 ]]; then
+        printf 'gaeta doctor\n'
+        printf '  project: %s\n' "${target_project}"
+        printf '\n'
+    fi
 
-    printf 'Dependencies\n'
+    CURRENT_DOCTOR_SECTION="Dependencies"
+    if [[ "${DOCTOR_JSON}" -ne 1 ]]; then
+        printf 'Dependencies\n'
+    fi
     if command -v bwrap >/dev/null 2>&1; then
         print_doctor_check "bwrap" "ok" "available"
     else
@@ -882,20 +1004,29 @@ DOCTOR_HELP
         ((warn_count += 1))
     fi
 
-    printf '\n'
-    printf 'Config Sources\n'
+    if [[ "${DOCTOR_JSON}" -ne 1 ]]; then
+        printf '\n'
+        printf 'Config Sources\n'
+    fi
+    CURRENT_DOCTOR_SECTION="Config Sources"
     print_doctor_check "opencode.json" "ok" "mode=${opencode_mode} gaeta=${gaeta_opencode_json} opencode=${opencode_opencode_json}"
     print_doctor_check "tui.json" "ok" "mode=${tui_mode} gaeta=${gaeta_tui_json} opencode=${opencode_tui_json}"
 
-    printf '\n'
-    printf 'Directory Sources\n'
+    if [[ "${DOCTOR_JSON}" -ne 1 ]]; then
+        printf '\n'
+        printf 'Directory Sources\n'
+    fi
+    CURRENT_DOCTOR_SECTION="Directory Sources"
     print_doctor_check "agents" "ok" "mode=${agents_mode} gaeta=${gaeta_agents_dir} opencode=${opencode_agents_dir}"
     print_doctor_check "commands" "ok" "mode=${commands_mode} gaeta=${gaeta_commands_dir} opencode=${opencode_commands_dir}"
     print_doctor_check "modes" "ok" "mode=${modes_mode} gaeta=${gaeta_modes_dir} opencode=${opencode_modes_dir}"
     print_doctor_check "plugins" "ok" "mode=${plugins_mode} gaeta=${gaeta_plugins_dir} opencode=${opencode_plugins_dir}"
 
-    printf '\n'
-    printf 'Projection Artifacts\n'
+    if [[ "${DOCTOR_JSON}" -ne 1 ]]; then
+        printf '\n'
+        printf 'Projection Artifacts\n'
+    fi
+    CURRENT_DOCTOR_SECTION="Projection Artifacts"
     print_doctor_check "projection refresh" "${projection_refresh_state}" "${projection_refresh_details}"
 
     if [[ -d "${projection_dir}" ]]; then
@@ -961,9 +1092,14 @@ DOCTOR_HELP
         print_doctor_check "projected plugins" "ok" "${projected_plugins_dir}"
     fi
 
-    printf '\n'
-    printf 'Sandbox Check\n'
-    if command -v bwrap >/dev/null 2>&1; then
+    if [[ "${DOCTOR_JSON}" -ne 1 ]]; then
+        printf '\n'
+        printf 'Sandbox Check\n'
+    fi
+    CURRENT_DOCTOR_SECTION="Sandbox Check"
+    if [[ "${GAETA_DOCTOR_SKIP_SANDBOX:-0}" == "1" ]]; then
+        print_doctor_check "sandbox execution" "ok" "skipped via GAETA_DOCTOR_SKIP_SANDBOX=1"
+    elif command -v bwrap >/dev/null 2>&1; then
         local sandbox_output=""
         if sandbox_output=$("${GAETA_SELF_PATH}" -q -b /bin/bash "${target_project}" -- -lc 'test -d /home/gaeta/.config/opencode && echo GAETA_DOCTOR_SANDBOX_OK' 2>&1); then
             if [[ "${sandbox_output}" == *"GAETA_DOCTOR_SANDBOX_OK"* ]]; then
@@ -986,8 +1122,11 @@ DOCTOR_HELP
     local workflow_backlog="${target_project}/docs/.gaeta/backlog.md"
     local workflow_phases="${target_project}/docs/.gaeta/phases.md"
 
-    printf '\n'
-    printf 'Workflow Files\n'
+    if [[ "${DOCTOR_JSON}" -ne 1 ]]; then
+        printf '\n'
+        printf 'Workflow Files\n'
+    fi
+    CURRENT_DOCTOR_SECTION="Workflow Files"
     if [[ -f "${workflow_phases}" ]]; then
         print_doctor_check "phases.md" "ok" "${workflow_phases}"
     else
@@ -1016,9 +1155,15 @@ DOCTOR_HELP
         ((warn_count += 1))
     fi
 
-    printf '\n'
-    printf 'Summary\n'
-    printf '  fail=%s warn=%s\n' "${fail_count}" "${warn_count}"
+    if [[ "${DOCTOR_JSON}" -eq 1 ]]; then
+        if ! render_doctor_json "${target_project}" "${fail_count}" "${warn_count}" "${generated_at}"; then
+            return 1
+        fi
+    else
+        printf '\n'
+        printf 'Summary\n'
+        printf '  fail=%s warn=%s\n' "${fail_count}" "${warn_count}"
+    fi
 
     if [[ "${fail_count}" -gt 0 ]]; then
         return 1
@@ -1310,7 +1455,8 @@ run_validation() {
     echo ""
     info "Test A.1: HOME isolation"
     local home_result
-    home_result=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'echo $HOME' 2>&1 || true)
+    # shellcheck disable=SC2016
+    home_result=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'echo "$HOME"' 2>&1 || true)
     if [[ "${home_result}" == "/home/gaeta" ]]; then
         echo "✅ Test A.1 PASS: HOME is /home/gaeta (isolated)"
     else
@@ -1321,9 +1467,7 @@ run_validation() {
     # Test A.2: bashrc write isolation (no leak to host)
     info "Test A.2: ~/.bashrc write isolation"
     local host_bashrc="${HOME}/.bashrc"
-    local had_bashrc=0
-    [[ -f "${host_bashrc}" ]] && had_bashrc=1
-    "${script_path}" -q "${test_project}" -- /bin/bash -c 'echo "GAETA_TEST" > ~/.bashrc' 2>&1 >/dev/null || true
+    "${script_path}" -q "${test_project}" -- /bin/bash -c 'echo "GAETA_TEST" > ~/.bashrc' >/dev/null 2>&1 || true
     local leaked=0
     if [[ -f "${host_bashrc}" ]]; then
         if grep -q "GAETA_TEST" "${host_bashrc}" 2>/dev/null; then
@@ -1426,7 +1570,8 @@ run_validation() {
     # Test D: Tooling PATH
     info "Test D: .venv in PATH"
     local venv_path
-    venv_path=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'echo $PATH' 2>&1 || true)
+    # shellcheck disable=SC2016
+    venv_path=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'echo "$PATH"' 2>&1 || true)
     if echo "${venv_path}" | grep -q ".venv/bin"; then
         echo "✅ Test D PASS: .venv/bin is in PATH"
     else

@@ -1,0 +1,31 @@
+SHELL := /usr/bin/env bash
+
+.PHONY: lint test
+
+SHELL_SOURCES := gaeta scripts/test-doctor.sh
+SHELLHARDEN_SOURCES := scripts/test-doctor.sh tests/doctor.bats
+
+GREEN := \033[0;32m
+YELLOW := \033[1;33m
+BLUE := \033[0;34m
+NC := \033[0m
+
+lint:
+	@printf "$(BLUE)==> Running lint checks$(NC)\n"
+	@bash -n $(SHELL_SOURCES) && printf "$(GREEN)[OK] bash -n$(NC)\n"
+	@shellcheck $(SHELL_SOURCES) && printf "$(GREEN)[OK] shellcheck$(NC)\n"
+	@shfmt -i 2 -ci -d scripts/test-doctor.sh tests/doctor.bats && printf "$(GREEN)[OK] shfmt$(NC)\n"
+	@if command -v shellharden >/dev/null 2>&1; then \
+		shellharden --check $(SHELLHARDEN_SOURCES) && printf "$(GREEN)[OK] shellharden$(NC)\n"; \
+	else \
+		printf "$(YELLOW)[SKIP] shellharden not found$(NC)\n"; \
+	fi
+
+test:
+	@printf "$(BLUE)==> Running test checks$(NC)\n"
+	@if command -v bats >/dev/null 2>&1; then \
+		bats tests/doctor.bats && printf "$(GREEN)[OK] bats doctor suite$(NC)\n"; \
+	else \
+		printf "$(YELLOW)[SKIP] bats not found; using shell test fallback$(NC)\n"; \
+		./scripts/test-doctor.sh && printf "$(GREEN)[OK] shell fallback suite$(NC)\n"; \
+	fi

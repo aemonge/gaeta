@@ -19,6 +19,9 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Generated projection artifacts are now emitted under `./.gaeta/projection/` (`opencode.json`, `tui.json`, `projection.json`).
 - Directory projection now covers `agents/`, `commands/`, `modes/`, and `plugins/` using mirror strategy with gaeta-over-opencode precedence.
 - `gaeta doctor` now performs self-inspection for dependencies, config sources, projection artifacts, workflow files, and an in-sandbox launch check.
+- `gaeta doctor --json` now emits machine-readable output for repeatable validation and TDD automation.
+- `make lint` and `make test` now exist; test flow prefers `bats` and falls back to shell script validation for doctor JSON and config inheritance, with shellharden checks on hardened test scripts.
+- `make lint`/`make test` now provide colored, explicit status markers for check outcomes.
 - Repo docs were previously split/inconsistent; canonical workflow location is now `docs/.gaeta/`.
 - Legacy root/reference files were archived under `docs/references/` to reduce root noise.
 
@@ -46,6 +49,8 @@ Implement checklist/status sync behavior for gaeta workflow files, then add meth
 - Runtime projection semantics now generate concrete config artifacts in repo-local `.gaeta/projection/` and bind those into sandbox config paths.
 - Directory projection semantics are now fixed to mirror mode (no direct symlink): merge OpenCode base + gaeta overrides, with structured file key-level merge for JSON/YAML.
 - Self-inspection command naming is `gaeta doctor` only (no inspect alias).
+- Doctor output modes are now dual: human-readable default and JSON via `--json`.
+- Doctor JSON and human outputs now share the same check collection source and differ only in rendering.
 - `docs/.gaeta/` is the canonical repository workflow control plane.
 - Markdown checklists are the workflow task system.
 - Self-updating behavior is approval-gated only.

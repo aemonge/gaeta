@@ -6,7 +6,7 @@
 - Direction: OpenCode-safe wrapper with phase-driven, methodology-enforced agent workflow.
 - Current phase: Phase 0 -> Phase 1 handoff.
 - Current sprint: workflow sync + methodology enforcement integration.
-- Diagnostics: `gaeta doctor` available for self-inspection.
+- Diagnostics: `gaeta doctor` (human) and `gaeta doctor --json` (machine-readable) available for self-inspection, with `make lint`/`make test` entrypoints.
 
 ## Next Step
 
