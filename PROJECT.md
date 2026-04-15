@@ -7,9 +7,12 @@
 - Current phase: Phase 0 -> Phase 1 handoff.
 - Current sprint: workflow sync + methodology enforcement integration.
 - Diagnostics: `gaeta doctor` (human) and `gaeta doctor --json` (machine-readable) available for self-inspection, with `make lint`/`make test` entrypoints.
+- Install bundle: `make build` installs `opencode.json` and `/handoff` command template into `~/.config/gaeta`.
 - Terminal UX: interactive runs default to compatibility redraw mode; strict TTY isolation is opt-in via `--strict-tty`.
 - Session continuity: `gaeta resume` (`gaeta r`) launches OpenCode with `--agent plan` and the documented resume prompt; use `--show` to preview command/prompt.
+- Resume priority: when available, `gaeta resume` now prefers `docs/.gaeta/handoff.md` narrative context before `PROJECT.md`/`status.md` fallback.
 - Runtime permissions: root `opencode.json` now uses an allow baseline for `read`/`edit`/`external_directory` plus explicit destructive bash denies.
+- Handoff operator surface: use OpenCode `/handoff` as the single canonical handoff command (no aliases).
 
 ## Next Step
 

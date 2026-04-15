@@ -995,6 +995,16 @@ handoff_text = (
     "- Trigger: gaeta handoff\n\n"
     "## Current phase\n\n"
     f"{phase_value}\n\n"
+    "## Project update\n\n"
+    "- Pending capture via /handoff.\n\n"
+    "## Conversation summary\n\n"
+    "- Pending capture via /handoff.\n\n"
+    "## Attempts and outcomes\n\n"
+    "- Pending capture via /handoff.\n\n"
+    "## Decisions\n\n"
+    "- Pending capture via /handoff.\n\n"
+    "## Frozen items\n\n"
+    "- Pending capture via /handoff.\n\n"
     "## Next step\n\n"
     f"{next_step_value}\n\n"
     "## Top pending sprint items\n\n"
@@ -1534,6 +1544,7 @@ run_resume_command() {
     local project_file
     local status_file
     local checklist_file
+    local handoff_file
     local resume_prompt
     local opencode_bin
     local resume_agent
@@ -1577,6 +1588,7 @@ RESUME_HELP
     target_project="$(realpath "${target_project}")"
     status_file="${target_project}/docs/.gaeta/status.md"
     checklist_file="${target_project}/docs/.gaeta/checklist.md"
+    handoff_file="${target_project}/docs/.gaeta/handoff.md"
     project_file="${target_project}/PROJECT.md"
 
     if ! command -v python3 >/dev/null 2>&1; then
@@ -1584,7 +1596,7 @@ RESUME_HELP
         return 1
     fi
 
-    resume_prompt=$(python3 - "${project_file}" "${status_file}" "${checklist_file}" <<'PY'
+    resume_prompt=$(python3 - "${project_file}" "${status_file}" "${checklist_file}" "${handoff_file}" <<'PY'
 import pathlib
 import re
 import sys
@@ -1606,10 +1618,45 @@ def section_body(text: str, heading: str) -> str:
 project_path = pathlib.Path(sys.argv[1])
 status_path = pathlib.Path(sys.argv[2])
 checklist_path = pathlib.Path(sys.argv[3])
+handoff_path = pathlib.Path(sys.argv[4])
 
 project_text = project_path.read_text(encoding="utf-8") if project_path.exists() else ""
 status_text = status_path.read_text(encoding="utf-8") if status_path.exists() else ""
 checklist_text = checklist_path.read_text(encoding="utf-8") if checklist_path.exists() else ""
+handoff_text = handoff_path.read_text(encoding="utf-8") if handoff_path.exists() else ""
+
+handoff_phase = section_body(handoff_text, "Current phase")
+handoff_next = section_body(handoff_text, "Next step")
+handoff_project_update = section_body(handoff_text, "Project update")
+handoff_conversation = section_body(handoff_text, "Conversation summary")
+handoff_attempts = section_body(handoff_text, "Attempts and outcomes")
+handoff_decisions = section_body(handoff_text, "Decisions")
+handoff_frozen = section_body(handoff_text, "Frozen items")
+handoff_blockers = section_body(handoff_text, "Blockers")
+
+if handoff_text and (handoff_project_update or handoff_conversation or handoff_attempts or handoff_decisions or handoff_frozen):
+    phase_value = " ".join(line.strip() for line in handoff_phase.splitlines() if line.strip()) or "unknown"
+    next_value = " ".join(line.strip() for line in handoff_next.splitlines() if line.strip()) or "(not defined)"
+    project_update_value = " ".join(line.strip() for line in handoff_project_update.splitlines() if line.strip()) or "(not recorded)"
+    conversation_value = " ".join(line.strip() for line in handoff_conversation.splitlines() if line.strip()) or "(not recorded)"
+    attempts_value = " ".join(line.strip() for line in handoff_attempts.splitlines() if line.strip()) or "(not recorded)"
+    decisions_value = " ".join(line.strip() for line in handoff_decisions.splitlines() if line.strip()) or "(not recorded)"
+    frozen_value = " ".join(line.strip() for line in handoff_frozen.splitlines() if line.strip()) or "(none)"
+    blockers_value = " ".join(line.strip() for line in handoff_blockers.splitlines() if line.strip()) or "(none)"
+
+    resume_prompt = (
+        f"Phase: {phase_value}. Next: {next_value}. "
+        f"Project update: {project_update_value}. "
+        f"Conversation summary: {conversation_value}. "
+        f"Attempts and outcomes: {attempts_value}. "
+        f"Decisions: {decisions_value}. "
+        f"Frozen items: {frozen_value}. "
+        f"Blockers: {blockers_value}. "
+        "Read AGENTS.md and docs/.gaeta files plus PROJECT.md and GAETA.md. "
+        "Provide a concise read-only handoff and propose the first implementation slice and validation commands."
+    )
+    print(resume_prompt)
+    raise SystemExit(0)
 
 resume_prompt_body = section_body(project_text, "Resume Prompt")
 resume_prompt = ""

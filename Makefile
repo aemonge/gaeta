@@ -1,14 +1,28 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: lint test
+.PHONY: build lint test
 
 SHELL_SOURCES := gaeta scripts/test-doctor.sh
 SHELLHARDEN_SOURCES := scripts/test-doctor.sh tests/doctor.bats
+GAETA_CONFIG_HOME ?= $(HOME)/.config/gaeta
 
 GREEN := \033[0;32m
 YELLOW := \033[1;33m
 BLUE := \033[0;34m
 NC := \033[0m
+
+build:
+	@printf "$(BLUE)==> Installing gaeta config bundle$(NC)\n"
+	@mkdir -p "$(GAETA_CONFIG_HOME)/commands"
+	@install -m 0644 opencode.json "$(GAETA_CONFIG_HOME)/opencode.json"
+	@install -m 0644 .opencode/commands/handoff.md "$(GAETA_CONFIG_HOME)/commands/handoff.md"
+	@if [ -f tui.json ]; then \
+		install -m 0644 tui.json "$(GAETA_CONFIG_HOME)/tui.json"; \
+		printf "$(GREEN)[OK] installed tui.json$(NC)\n"; \
+	else \
+		printf "$(YELLOW)[SKIP] tui.json not found$(NC)\n"; \
+	fi
+	@printf "$(GREEN)[OK] installed opencode.json + commands/handoff.md to $(GAETA_CONFIG_HOME)$(NC)\n"
 
 lint:
 	@printf "$(BLUE)==> Running lint checks$(NC)\n"

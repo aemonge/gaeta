@@ -158,6 +158,50 @@ PY
   [[ "$output" == *"gaeta resume"* ]]
 }
 
+@test "resume prefers docs/.gaeta/handoff.md context when present" {
+  cat >"${TEST_PROJECT}/docs/.gaeta/handoff.md" <<'MD'
+# Handoff
+
+## Current phase
+
+Phase 1
+
+## Project update
+
+- Wrapper projection rules aligned with current sprint.
+
+## Conversation summary
+
+- Decided to keep a single /handoff command with no aliases.
+
+## Attempts and outcomes
+
+- Attempted alias approach and rejected it to stay lean.
+
+## Decisions
+
+- Keep /handoff as the canonical handoff entrypoint.
+
+## Frozen items
+
+- No alias commands.
+
+## Next step
+
+Implement handoff-first resume prompt parsing.
+
+## Blockers
+
+- none
+MD
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Project update:"* ]]
+  [[ "$output" == *"single /handoff command with no aliases"* ]]
+  [[ "$output" == *"Frozen items:"* ]]
+}
+
 @test "tasks sync works without mdt and updates status" {
   run env HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
   [ "$status" -eq 0 ]
@@ -193,6 +237,8 @@ session_log = (project / ".gaeta" / "session.log").read_text(encoding="utf-8")
 assert "# Handoff" in handoff_text, handoff_text
 assert "## Current phase" in handoff_text, handoff_text
 assert "Phase X" in handoff_text, handoff_text
+assert "## Project update" in handoff_text, handoff_text
+assert "Pending capture via /handoff." in handoff_text, handoff_text
 assert "## Top pending sprint items" in handoff_text, handoff_text
 assert "Implement sync behavior." in handoff_text, handoff_text
 assert "Add methodology-enforced instructions." in handoff_text, handoff_text
@@ -200,6 +246,17 @@ assert "Add methodology-enforced instructions." in handoff_text, handoff_text
 assert "## Next Step" in project_text, project_text
 assert "Implement sync behavior." in project_text, project_text
 assert "handoff: synced status and wrote docs/.gaeta/handoff.md" in session_log, session_log
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "handoff slash command runs with build agent" {
+  run python3 - "$REPO_ROOT/.opencode/commands/handoff.md" <<'PY'
+import pathlib
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+assert "agent: build" in text, text
 PY
   [ "$status" -eq 0 ]
 }

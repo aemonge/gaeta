@@ -21,6 +21,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - `gaeta doctor` now performs self-inspection for dependencies, config sources, projection artifacts, workflow files, and an in-sandbox launch check.
 - `gaeta doctor --json` now emits machine-readable output for repeatable validation and TDD automation.
 - `make lint` and `make test` now exist; test flow prefers `bats` and falls back to shell script validation for doctor JSON and config inheritance, with shellharden checks on hardened test scripts.
+- `make build` now installs a lean config bundle to `~/.config/gaeta` (`opencode.json` and `commands/handoff.md`, plus optional `tui.json` when present).
 - `make lint`/`make test` now provide colored, explicit status markers for check outcomes.
 - Interactive sessions now default to TTY compatibility mode (better resize/redraw behavior), with strict session isolation opt-in via `--strict-tty`.
 - `gaeta resume` (`gaeta r`) now launches a resumed gaeta session using OpenCode `--agent plan` plus a read-only handoff `--prompt`, with `--show` for dry-run visibility.
@@ -31,6 +32,9 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - `gaeta tasks sync` now uses an explicit built-in sync path so status updates work even when `mdt` is installed.
 - `gaeta handoff` now syncs `docs/.gaeta/status.md`, writes `docs/.gaeta/handoff.md`, updates `PROJECT.md` `## Next Step`, and appends a runtime handoff log entry.
 - Per-project OpenCode `/handoff` is now available via `.opencode/commands/handoff.md`.
+- `/handoff` is now the single canonical handoff interface (no aliases), with richer narrative capture sections in `docs/.gaeta/handoff.md`.
+- `/handoff` slash-command now runs with `agent: build` to avoid read-only Plan-mode execution blocks.
+- `gaeta resume` now prefers `docs/.gaeta/handoff.md` context (project update, conversation summary, attempts/outcomes, decisions, frozen items) before falling back to `PROJECT.md`/`status.md`.
 
 ## In progress
 
@@ -69,3 +73,5 @@ Add methodology-enforced agent instructions per phase.
 - `sem` is the preferred semantic diff dependency; gaeta should fall back to `git diff` if unavailable.
 - Handoff updates are implemented as an explicit wrapper command (`gaeta handoff`) plus a per-project OpenCode slash-command template (`.opencode/commands/handoff.md`).
 - Updated root permission baseline to avoid build-agent deadlocks caused by overly narrow `external_directory`/`edit` patterns.
+- Keep `/handoff` as the only handoff slash command (no alias commands).
+- `/handoff` should execute under Build agent policy because it performs file updates (`./gaeta handoff` + handoff doc edits).
