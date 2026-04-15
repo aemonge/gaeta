@@ -5,11 +5,11 @@
 - Name: gaeta
 - Direction: OpenCode-safe wrapper with phase-driven, methodology-enforced agent workflow.
 - Current phase: Phase 0 -> Phase 1 handoff.
-- Current sprint: projection contract + task tooling integration (`mdt` with fallback).
+- Current sprint: directory projection contract + workflow sync integration.
 
 ## Next Step
 
-Implement `gaeta tasks` around `mdt` with graceful fallback, then implement minimal gaeta config projection output for OpenCode compatibility.
+Implement directory projection for `agents/`, `commands/`, `modes/`, and `plugins/`, starting with a safety contract for symlink vs mirror behavior.
 
 ## Blockers
 

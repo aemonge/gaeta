@@ -24,9 +24,11 @@ gaeta 0.9.0
 Safe OpenCode wrapper using bubblewrap with optional Landlock defense-in-depth.
 
 Usage:
+  gaeta tasks [TASK_ARGS...]
   gaeta [options] [PROJECT_DIR] [-- [OPENCODE_ARGS...]]
 
 Options:
+  tasks                  Run task workflow via mdt (with fallback)
   -h, --help              Show this help and exit
   -V, --version           Show version and exit
   -n, --no-net            Disable network access inside the sandbox (default: on)
@@ -57,6 +59,7 @@ PARANOID_EOF
     cat <<'USAGE_END'
 
 Arguments:
+  TASK_ARGS              Passed to mdt when available
   PROJECT_DIR             Project directory exposed at same absolute path (default: $PWD)
   OPENCODE_ARGS           Arguments passed verbatim to opencode after "--"
 
@@ -64,6 +67,7 @@ Environment:
   OPENCODE_BIN            Overrides default opencode binary
   GAETA_NET              "on" to enable network by default ("off" otherwise)
   GAETA_FS_MODE          "ro" (secure) or "rw" (default, allow writes)
+  GAETA_TASKS_FORCE_FALLBACK  "1" to bypass mdt and use built-in tasks fallback
 
 Protected Directories (read-only by default):
   .git, .turbo, .next, dist, build, target, .cargo
@@ -97,6 +101,8 @@ Paranoid Mode (Defense-in-Depth):
     - Linux kernel 6.7+ for network syscall restrictions
 
 Examples:
+  gaeta tasks              # run mdt in docs/.gaeta (or fallback view)
+  gaeta tasks -m           # add multiple tasks via mdt
   gaeta                    # rw sandbox of $PWD, infra protected, paranoid if available
   gaeta --validate         # run comprehensive validation tests
   gaeta --ro               # read-only sandbox of $PWD
@@ -273,6 +279,187 @@ select_overlay_config() {
     printf ''
 }
 
+materialize_projection_files() {
+    local selected_opencode="$1"
+    local selected_tui="$2"
+
+    local source_opencode=""
+    local source_tui=""
+    local active_opencode="${selected_opencode}"
+    local active_tui="${selected_tui}"
+
+    if [[ "${GAETA_META_ENABLED:-0}" -ne 1 ]]; then
+        CUSTOM_CONFIG="${active_opencode}"
+        TUI_CONFIG="${active_tui}"
+        return 0
+    fi
+
+    mkdir -p "${GAETA_PROJECTION_DIR}"
+
+    if [[ -n "${selected_opencode}" && -f "${selected_opencode}" ]]; then
+        source_opencode="${selected_opencode}"
+        cp "${selected_opencode}" "${GAETA_PROJECTED_OPENCODE_JSON}"
+        active_opencode="${GAETA_PROJECTED_OPENCODE_JSON}"
+    else
+        rm -f "${GAETA_PROJECTED_OPENCODE_JSON}" 2>/dev/null || true
+    fi
+
+    if [[ -n "${selected_tui}" && -f "${selected_tui}" ]]; then
+        source_tui="${selected_tui}"
+        cp "${selected_tui}" "${GAETA_PROJECTED_TUI_JSON}"
+        active_tui="${GAETA_PROJECTED_TUI_JSON}"
+    else
+        rm -f "${GAETA_PROJECTED_TUI_JSON}" 2>/dev/null || true
+    fi
+
+    cat >"${GAETA_PROJECTION_META}" <<EOF
+{
+  "timestamp": "$(date -Iseconds)",
+  "strategy": "generated projection",
+  "project_dir": "$(json_escape "${PROJECT_DIR}")",
+  "opencode_json": {
+    "source": "$(json_escape "${source_opencode}")",
+    "generated": "$(json_escape "${active_opencode}")",
+    "present": $([[ -n "${active_opencode}" ]] && printf 'true' || printf 'false')
+  },
+  "tui_json": {
+    "source": "$(json_escape "${source_tui}")",
+    "generated": "$(json_escape "${active_tui}")",
+    "present": $([[ -n "${active_tui}" ]] && printf 'true' || printf 'false')
+  }
+}
+EOF
+
+    CUSTOM_CONFIG="${active_opencode}"
+    TUI_CONFIG="${active_tui}"
+}
+
+contains_option() {
+    local needle="$1"
+    shift
+    local arg
+    for arg in "$@"; do
+        if [[ "${arg}" == "${needle}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+run_tasks_fallback() {
+    local checklist_path="$1"
+    shift
+
+    local action="${1:-list}"
+    case "${action}" in
+    list)
+        if [[ -f "${checklist_path}" ]]; then
+            cat "${checklist_path}"
+            return 0
+        fi
+        error "checklist not found: ${checklist_path}"
+        return 1
+        ;;
+    path)
+        printf '%s\n' "${checklist_path}"
+        return 0
+        ;;
+    add)
+        shift || true
+        if [[ $# -lt 1 ]]; then
+            error "fallback usage: gaeta tasks add \"task text\""
+            return 1
+        fi
+        mkdir -p "$(dirname "${checklist_path}")"
+        if [[ ! -f "${checklist_path}" ]]; then
+            printf '# Checklist\n\n## Current Sprint\n\n' >"${checklist_path}"
+        fi
+        printf -- '- [ ] %s\n' "$*" >>"${checklist_path}"
+        info "added task to ${checklist_path}"
+        return 0
+        ;;
+    done)
+        shift || true
+        if [[ $# -lt 1 ]]; then
+            error "fallback usage: gaeta tasks done \"task text\""
+            return 1
+        fi
+        if [[ ! -f "${checklist_path}" ]]; then
+            error "checklist not found: ${checklist_path}"
+            return 1
+        fi
+        if ! command -v python3 >/dev/null 2>&1; then
+            error "python3 is required for fallback done operation"
+            return 1
+        fi
+        python3 - "${checklist_path}" "$*" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+needle = sys.argv[2].strip().lower()
+lines = path.read_text(encoding="utf-8").splitlines()
+updated = False
+
+for idx, line in enumerate(lines):
+    if updated:
+        break
+    if not line.startswith("- [ ] "):
+        continue
+    content = re.sub(r"^\- \[ \] ", "", line).strip().lower()
+    if needle in content:
+        lines[idx] = line.replace("- [ ]", "- [x]", 1)
+        updated = True
+
+if not updated:
+    print(f"gaeta: no matching open task for: {needle}", file=sys.stderr)
+    sys.exit(1)
+
+path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+        info "marked matching task as done in ${checklist_path}"
+        return 0
+        ;;
+    *)
+        error "fallback task action not supported: ${action}"
+        error "supported fallback actions: list, path, add, done"
+        return 1
+        ;;
+    esac
+}
+
+run_tasks_command() {
+    local project_dir="$1"
+    shift
+    local -a task_args=("$@")
+
+    local gaeta_dir="${project_dir}/docs/.gaeta"
+    local checklist_path="${gaeta_dir}/checklist.md"
+
+    if [[ ! -d "${gaeta_dir}" ]]; then
+        warning "docs/.gaeta not found in ${project_dir}; using fallback mode"
+        run_tasks_fallback "${checklist_path}" "${task_args[@]}"
+        return $?
+    fi
+
+    if [[ "${GAETA_TASKS_FORCE_FALLBACK:-0}" != "1" ]] && command -v mdt >/dev/null 2>&1; then
+        local -a mdt_cmd=(mdt)
+        if ! contains_option "--dir" "${task_args[@]}" && ! contains_option "-d" "${task_args[@]}"; then
+            mdt_cmd+=(--dir "${gaeta_dir}")
+        fi
+        if ! contains_option "--inbox" "${task_args[@]}" && ! contains_option "-i" "${task_args[@]}"; then
+            mdt_cmd+=(--inbox "${checklist_path}")
+        fi
+        mdt_cmd+=("${task_args[@]}")
+        info "Running tasks via mdt in ${gaeta_dir}"
+        exec "${mdt_cmd[@]}"
+    fi
+
+    warning "mdt unavailable or fallback forced; using built-in fallback tasks mode"
+    run_tasks_fallback "${checklist_path}" "${task_args[@]}"
+}
+
 update_phase() {
     local phase="$1"
     if [[ "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
@@ -350,12 +537,17 @@ init_metadata_dir() {
     GAETA_PHASE_FILE="${GAETA_META_DIR}/phase"
     GAETA_COMMAND_JSON="${GAETA_META_DIR}/command.json"
     GAETA_APPROVAL_LOG="${GAETA_META_DIR}/approval.log"
+    GAETA_PROJECTION_DIR="${GAETA_META_DIR}/projection"
+    GAETA_PROJECTION_META="${GAETA_PROJECTION_DIR}/projection.json"
+    GAETA_PROJECTED_OPENCODE_JSON="${GAETA_PROJECTION_DIR}/opencode.json"
+    GAETA_PROJECTED_TUI_JSON="${GAETA_PROJECTION_DIR}/tui.json"
 
     if mkdir -p "${GAETA_META_DIR}" 2>/dev/null; then
         GAETA_META_ENABLED=1
         : >"${GAETA_PHASE_FILE}" || true
         : >"${GAETA_COMMAND_JSON}" || true
         touch "${GAETA_SESSION_LOG}" "${GAETA_APPROVAL_LOG}" 2>/dev/null || true
+        mkdir -p "${GAETA_PROJECTION_DIR}" 2>/dev/null || true
     else
         warning "cannot write metadata in ${GAETA_META_DIR}"
     fi
@@ -784,6 +976,15 @@ MERGED_CONFIG_DIR=""
 PROJECT_DIR=""
 OPENCODE_ARGS=()
 
+# Command dispatch: gaeta tasks ...
+if [[ "${1:-}" == "tasks" ]]; then
+    shift
+    if ! run_tasks_command "${PWD}" "$@"; then
+        exit 1
+    fi
+    exit 0
+fi
+
 # -------- option parsing --------
 RO_SET=0
 RW_SET=0
@@ -997,6 +1198,8 @@ fi
 if ! TUI_CONFIG=$(select_overlay_config "tui.json" "${GAETA_TUI_CONFIG}" "${OPENCODE_DEFAULT_TUI_CONFIG}" "${MERGED_CONFIG_DIR}/tui.json"); then
     exit 1
 fi
+
+materialize_projection_files "${CUSTOM_CONFIG}" "${TUI_CONFIG}"
 
 # Network flags
 NET_FLAGS=()
