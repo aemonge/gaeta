@@ -17,25 +17,25 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - `gaeta tasks` now delegates to `mdt` with default `docs/.gaeta` + `checklist.md` wiring and a built-in fallback mode when `mdt` is unavailable.
 - Runtime metadata is now written under `./.gaeta/` (`phase`, `command.json`, `session.log`, `approval.log`).
 - Generated projection artifacts are now emitted under `./.gaeta/projection/` (`opencode.json`, `tui.json`, `projection.json`).
+- Directory projection now covers `agents/`, `commands/`, `modes/`, and `plugins/` using mirror strategy with gaeta-over-opencode precedence.
+- `gaeta doctor` now performs self-inspection for dependencies, config sources, projection artifacts, workflow files, and an in-sandbox launch check.
 - Repo docs were previously split/inconsistent; canonical workflow location is now `docs/.gaeta/`.
 - Legacy root/reference files were archived under `docs/references/` to reduce root noise.
 
 ## In progress
 
-- Implement directory projection for agents/commands/modes/plugins.
 - Define commit-sized implementation slices with human checkpoints.
 - Define checklist/status sync behavior for gaeta workflow files.
+- Add methodology-enforced agent instructions per phase.
 
 ## Blockers
 
-- Need to decide exact projection semantics for directories vs config files.
-- Need to verify which OpenCode customization directories are safest to symlink directly.
 - Need to define the first approval-gated Darwin/Godel proposal format.
 - Full sandbox runtime validation is limited in this environment due namespace limits (`bwrap` ENOSPC), so wrapper behavior validation is currently partial.
 
 ## Next step
 
-Implement directory projection for `agents/`, `commands/`, `modes/`, and `plugins/`, starting with a minimal projection metadata contract for symlink vs mirror decisions.
+Implement checklist/status sync behavior for gaeta workflow files, then add methodology-enforced agent instructions per phase.
 
 ## Decisions
 
@@ -44,6 +44,8 @@ Implement directory projection for `agents/`, `commands/`, `modes/`, and `plugin
 - Legacy `gaeta.json`/`scoder.json` config fallbacks are removed to keep config behavior explicit and clean.
 - Config merge semantics are recursive key-level overlay: OpenCode base + gaeta override for JSON/YAML structured config.
 - Runtime projection semantics now generate concrete config artifacts in repo-local `.gaeta/projection/` and bind those into sandbox config paths.
+- Directory projection semantics are now fixed to mirror mode (no direct symlink): merge OpenCode base + gaeta overrides, with structured file key-level merge for JSON/YAML.
+- Self-inspection command naming is `gaeta doctor` only (no inspect alias).
 - `docs/.gaeta/` is the canonical repository workflow control plane.
 - Markdown checklists are the workflow task system.
 - Self-updating behavior is approval-gated only.

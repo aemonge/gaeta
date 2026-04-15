@@ -10,6 +10,7 @@ set -euo pipefail
 readonly PROGRAM_NAME="gaeta"
 readonly PROGRAM_VERSION="0.9.0"
 readonly OPENCODE_BIN_DEFAULT="/usr/bin/opencode"
+readonly GAETA_SELF_PATH="$(realpath "$0" 2>/dev/null || printf '%s' "$0")"
 
 # Colors for output
 readonly RED='\033[0;31m'
@@ -24,10 +25,12 @@ gaeta 0.9.0
 Safe OpenCode wrapper using bubblewrap with optional Landlock defense-in-depth.
 
 Usage:
+  gaeta doctor [PROJECT_DIR]
   gaeta tasks [TASK_ARGS...]
   gaeta [options] [PROJECT_DIR] [-- [OPENCODE_ARGS...]]
 
 Options:
+  doctor                 Run gaeta self-inspection checks
   tasks                  Run task workflow via mdt (with fallback)
   -h, --help              Show this help and exit
   -V, --version           Show version and exit
@@ -59,8 +62,9 @@ PARANOID_EOF
     cat <<'USAGE_END'
 
 Arguments:
+  DOCTOR_PROJECT_DIR     Optional target project for doctor mode
   TASK_ARGS              Passed to mdt when available
-  PROJECT_DIR             Project directory exposed at same absolute path (default: $PWD)
+  PROJECT_DIR            Project directory exposed at same absolute path (default: $PWD)
   OPENCODE_ARGS           Arguments passed verbatim to opencode after "--"
 
 Environment:
@@ -87,6 +91,12 @@ TUI Config Precedence (automatic):
   3. ~/.config/opencode/tui.json (if exists)
   4. No TUI config binding (OpenCode defaults)
 
+Directory Projection (automatic):
+  - Targets: agents/, commands/, modes/, plugins/
+  - Strategy: mirror projection (not symlink)
+  - Merge mode: opencode base overlaid by gaeta content
+  - Structured files (*.json, *.yaml, *.yml) merge recursively by key
+
 Paranoid Mode (Defense-in-Depth):
   When landrun is available, gaeta uses two-layer sandbox:
     1. Landlock (syscall-level enforcement via landrun)
@@ -101,6 +111,8 @@ Paranoid Mode (Defense-in-Depth):
     - Linux kernel 6.7+ for network syscall restrictions
 
 Examples:
+  gaeta doctor             # inspect gaeta config and projection health
+  gaeta doctor ../repo     # inspect another project
   gaeta tasks              # run mdt in docs/.gaeta (or fallback view)
   gaeta tasks -m           # add multiple tasks via mdt
   gaeta                    # rw sandbox of $PWD, infra protected, paranoid if available
@@ -169,6 +181,14 @@ json_escape() {
     value=${value//\"/\\\"}
     value=${value//$'\n'/\\n}
     printf '%s' "${value}"
+}
+
+init_projection_paths() {
+    GAETA_META_DIR="${PROJECT_DIR}/.gaeta"
+    GAETA_PROJECTION_DIR="${GAETA_META_DIR}/projection"
+    GAETA_PROJECTION_META="${GAETA_PROJECTION_DIR}/projection.json"
+    GAETA_PROJECTED_OPENCODE_JSON="${GAETA_PROJECTION_DIR}/opencode.json"
+    GAETA_PROJECTED_TUI_JSON="${GAETA_PROJECTION_DIR}/tui.json"
 }
 
 merge_structured_config_files() {
@@ -279,6 +299,160 @@ select_overlay_config() {
     printf ''
 }
 
+merge_structured_directory_tree() {
+    local base_dir="$1"
+    local override_dir="$2"
+    local output_dir="$3"
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        error "python3 is required for directory merge: ${override_dir} over ${base_dir}"
+        return 1
+    fi
+
+    python3 - "${base_dir}" "${override_dir}" "${output_dir}" <<'PY'
+import json
+import pathlib
+import shutil
+import sys
+
+
+def deep_merge(base, override):
+    if isinstance(base, dict) and isinstance(override, dict):
+        merged = dict(base)
+        for key, value in override.items():
+            if key in merged:
+                merged[key] = deep_merge(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
+    return override
+
+
+def load_structured(path):
+    suffix = path.suffix.lower()
+    text = path.read_text(encoding="utf-8")
+    if suffix == ".json":
+        return json.loads(text), "json"
+    if suffix in {".yaml", ".yml"}:
+        try:
+            import yaml
+        except Exception as exc:  # pragma: no cover
+            raise RuntimeError(
+                f"YAML merge requires PyYAML for file: {path}"
+            ) from exc
+        return yaml.safe_load(text), "yaml"
+    raise RuntimeError(f"Unsupported structured format: {path}")
+
+
+def dump_structured(path, data, fmt):
+    if fmt == "json":
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+        return
+    if fmt == "yaml":
+        try:
+            import yaml
+        except Exception as exc:  # pragma: no cover
+            raise RuntimeError(
+                f"YAML output requires PyYAML for file: {path}"
+            ) from exc
+        path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+        return
+    raise RuntimeError(f"Unsupported output format: {fmt}")
+
+
+def copy_tree(src, dst):
+    for path in src.rglob("*"):
+        rel = path.relative_to(src)
+        target = dst / rel
+        if path.is_symlink():
+            continue
+        if path.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target)
+
+
+def overlay_tree(base, override, out):
+    structured_ext = {".json", ".yaml", ".yml"}
+    for path in override.rglob("*"):
+        rel = path.relative_to(override)
+        target = out / rel
+        if path.is_symlink():
+            continue
+        if path.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists() and target.is_file() and path.suffix.lower() in structured_ext and target.suffix.lower() in structured_ext:
+            base_data, base_fmt = load_structured(target)
+            override_data, override_fmt = load_structured(path)
+            if base_fmt != override_fmt:
+                raise RuntimeError(f"Config format mismatch: {target} vs {path}")
+            merged = deep_merge(base_data, override_data)
+            dump_structured(target, merged, base_fmt)
+            continue
+        shutil.copy2(path, target)
+
+
+base = pathlib.Path(sys.argv[1])
+override = pathlib.Path(sys.argv[2])
+out = pathlib.Path(sys.argv[3])
+
+if out.exists():
+    shutil.rmtree(out)
+out.mkdir(parents=True, exist_ok=True)
+
+copy_tree(base, out)
+overlay_tree(base, override, out)
+PY
+}
+
+materialize_projection_directory() {
+    local dir_name="$1"
+    local gaeta_dir="$2"
+    local opencode_dir="$3"
+    local merged_target_dir="$4"
+    local projected_target_dir="$5"
+
+    MATERIALIZED_DIR_PATH=""
+    MATERIALIZED_DIR_SOURCE="none"
+
+    if [[ -d "${gaeta_dir}" && -d "${opencode_dir}" ]]; then
+        if ! merge_structured_directory_tree "${opencode_dir}" "${gaeta_dir}" "${merged_target_dir}"; then
+            error "failed to merge ${dir_name} projection directory"
+            return 1
+        fi
+        MATERIALIZED_DIR_SOURCE="merged"
+        MATERIALIZED_DIR_PATH="${merged_target_dir}"
+    elif [[ -d "${gaeta_dir}" ]]; then
+        rm -rf "${merged_target_dir}"
+        mkdir -p "${merged_target_dir}"
+        cp -a "${gaeta_dir}/." "${merged_target_dir}/"
+        MATERIALIZED_DIR_SOURCE="gaeta"
+        MATERIALIZED_DIR_PATH="${merged_target_dir}"
+    elif [[ -d "${opencode_dir}" ]]; then
+        rm -rf "${merged_target_dir}"
+        mkdir -p "${merged_target_dir}"
+        cp -a "${opencode_dir}/." "${merged_target_dir}/"
+        MATERIALIZED_DIR_SOURCE="opencode"
+        MATERIALIZED_DIR_PATH="${merged_target_dir}"
+    else
+        rm -rf "${merged_target_dir}"
+    fi
+
+    if [[ -n "${MATERIALIZED_DIR_PATH}" && "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
+        rm -rf "${projected_target_dir}"
+        mkdir -p "${projected_target_dir}"
+        cp -a "${MATERIALIZED_DIR_PATH}/." "${projected_target_dir}/"
+        MATERIALIZED_DIR_PATH="${projected_target_dir}"
+    elif [[ "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
+        rm -rf "${projected_target_dir}"
+    fi
+
+    return 0
+}
+
 materialize_projection_files() {
     local selected_opencode="$1"
     local selected_tui="$2"
@@ -287,6 +461,10 @@ materialize_projection_files() {
     local source_tui=""
     local active_opencode="${selected_opencode}"
     local active_tui="${selected_tui}"
+    local active_agents="${PROJECTED_AGENTS_DIR}"
+    local active_commands="${PROJECTED_COMMANDS_DIR}"
+    local active_modes="${PROJECTED_MODES_DIR}"
+    local active_plugins="${PROJECTED_PLUGINS_DIR}"
 
     if [[ "${GAETA_META_ENABLED:-0}" -ne 1 ]]; then
         CUSTOM_CONFIG="${active_opencode}"
@@ -326,12 +504,90 @@ materialize_projection_files() {
     "source": "$(json_escape "${source_tui}")",
     "generated": "$(json_escape "${active_tui}")",
     "present": $([[ -n "${active_tui}" ]] && printf 'true' || printf 'false')
+  },
+  "directories": {
+    "strategy": "mirror",
+    "agents": {
+      "source_mode": "$(json_escape "${PROJECTED_AGENTS_SOURCE}")",
+      "gaeta_source": "$(json_escape "${GAETA_AGENTS_DIR}")",
+      "opencode_source": "$(json_escape "${OPENCODE_AGENTS_DIR}")",
+      "generated": "$(json_escape "${active_agents}")",
+      "present": $([[ -n "${active_agents}" ]] && printf 'true' || printf 'false')
+    },
+    "commands": {
+      "source_mode": "$(json_escape "${PROJECTED_COMMANDS_SOURCE}")",
+      "gaeta_source": "$(json_escape "${GAETA_COMMANDS_DIR}")",
+      "opencode_source": "$(json_escape "${OPENCODE_COMMANDS_DIR}")",
+      "generated": "$(json_escape "${active_commands}")",
+      "present": $([[ -n "${active_commands}" ]] && printf 'true' || printf 'false')
+    },
+    "modes": {
+      "source_mode": "$(json_escape "${PROJECTED_MODES_SOURCE}")",
+      "gaeta_source": "$(json_escape "${GAETA_MODES_DIR}")",
+      "opencode_source": "$(json_escape "${OPENCODE_MODES_DIR}")",
+      "generated": "$(json_escape "${active_modes}")",
+      "present": $([[ -n "${active_modes}" ]] && printf 'true' || printf 'false')
+    },
+    "plugins": {
+      "source_mode": "$(json_escape "${PROJECTED_PLUGINS_SOURCE}")",
+      "gaeta_source": "$(json_escape "${GAETA_PLUGINS_DIR}")",
+      "opencode_source": "$(json_escape "${OPENCODE_PLUGINS_DIR}")",
+      "generated": "$(json_escape "${active_plugins}")",
+      "present": $([[ -n "${active_plugins}" ]] && printf 'true' || printf 'false')
+    }
   }
 }
 EOF
 
     CUSTOM_CONFIG="${active_opencode}"
     TUI_CONFIG="${active_tui}"
+}
+
+prepare_projection_artifacts() {
+    # Ensure OpenCode data/cache dirs exist (config handled separately)
+    OPENCODE_DATA="${HOME}/.local/share/opencode"
+    OPENCODE_CACHE="${HOME}/.cache/opencode"
+    mkdir -p "${OPENCODE_DATA}/sessions"
+    mkdir -p "${OPENCODE_DATA}/permissions"
+    mkdir -p "${OPENCODE_CACHE}"
+
+    MERGED_CONFIG_DIR="${OPENCODE_CACHE}/gaeta-merged"
+    mkdir -p "${MERGED_CONFIG_DIR}"
+
+    if ! CUSTOM_CONFIG=$(select_overlay_config "opencode.json" "${GAETA_CONFIG}" "${OPENCODE_DEFAULT_CONFIG}" "${MERGED_CONFIG_DIR}/opencode.json"); then
+        return 1
+    fi
+
+    if ! TUI_CONFIG=$(select_overlay_config "tui.json" "${GAETA_TUI_CONFIG}" "${OPENCODE_DEFAULT_TUI_CONFIG}" "${MERGED_CONFIG_DIR}/tui.json"); then
+        return 1
+    fi
+
+    if ! materialize_projection_directory "agents" "${GAETA_AGENTS_DIR}" "${OPENCODE_AGENTS_DIR}" "${MERGED_CONFIG_DIR}/agents" "${GAETA_PROJECTION_DIR}/agents"; then
+        return 1
+    fi
+    PROJECTED_AGENTS_DIR="${MATERIALIZED_DIR_PATH}"
+    PROJECTED_AGENTS_SOURCE="${MATERIALIZED_DIR_SOURCE}"
+
+    if ! materialize_projection_directory "commands" "${GAETA_COMMANDS_DIR}" "${OPENCODE_COMMANDS_DIR}" "${MERGED_CONFIG_DIR}/commands" "${GAETA_PROJECTION_DIR}/commands"; then
+        return 1
+    fi
+    PROJECTED_COMMANDS_DIR="${MATERIALIZED_DIR_PATH}"
+    PROJECTED_COMMANDS_SOURCE="${MATERIALIZED_DIR_SOURCE}"
+
+    if ! materialize_projection_directory "modes" "${GAETA_MODES_DIR}" "${OPENCODE_MODES_DIR}" "${MERGED_CONFIG_DIR}/modes" "${GAETA_PROJECTION_DIR}/modes"; then
+        return 1
+    fi
+    PROJECTED_MODES_DIR="${MATERIALIZED_DIR_PATH}"
+    PROJECTED_MODES_SOURCE="${MATERIALIZED_DIR_SOURCE}"
+
+    if ! materialize_projection_directory "plugins" "${GAETA_PLUGINS_DIR}" "${OPENCODE_PLUGINS_DIR}" "${MERGED_CONFIG_DIR}/plugins" "${GAETA_PROJECTION_DIR}/plugins"; then
+        return 1
+    fi
+    PROJECTED_PLUGINS_DIR="${MATERIALIZED_DIR_PATH}"
+    PROJECTED_PLUGINS_SOURCE="${MATERIALIZED_DIR_SOURCE}"
+
+    materialize_projection_files "${CUSTOM_CONFIG}" "${TUI_CONFIG}"
+    return 0
 }
 
 contains_option() {
@@ -460,6 +716,316 @@ run_tasks_command() {
     run_tasks_fallback "${checklist_path}" "${task_args[@]}"
 }
 
+detect_file_source_mode() {
+    local gaeta_file="$1"
+    local opencode_file="$2"
+
+    if [[ -f "${gaeta_file}" && -f "${opencode_file}" ]]; then
+        printf 'merged'
+        return
+    fi
+    if [[ -f "${gaeta_file}" ]]; then
+        printf 'gaeta'
+        return
+    fi
+    if [[ -f "${opencode_file}" ]]; then
+        printf 'opencode'
+        return
+    fi
+    printf 'none'
+}
+
+detect_dir_source_mode() {
+    local gaeta_dir="$1"
+    local opencode_dir="$2"
+
+    if [[ -d "${gaeta_dir}" && -d "${opencode_dir}" ]]; then
+        printf 'merged'
+        return
+    fi
+    if [[ -d "${gaeta_dir}" ]]; then
+        printf 'gaeta'
+        return
+    fi
+    if [[ -d "${opencode_dir}" ]]; then
+        printf 'opencode'
+        return
+    fi
+    printf 'none'
+}
+
+print_doctor_check() {
+    local label="$1"
+    local state="$2"
+    local details="$3"
+    printf '  %-22s %-6s %s\n' "${label}" "[${state}]" "${details}"
+}
+
+run_doctor_command() {
+    local target_project="${PWD}"
+
+    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+        cat <<'DOCTOR_HELP'
+Usage:
+  gaeta doctor [PROJECT_DIR]
+
+Runs gaeta self-inspection checks for dependencies, config source selection,
+projection artifacts, and workflow files.
+DOCTOR_HELP
+        return 0
+    fi
+
+    if [[ $# -gt 1 ]]; then
+        error "doctor accepts at most one optional PROJECT_DIR"
+        return 1
+    fi
+
+    if [[ $# -eq 1 ]]; then
+        target_project="$1"
+    fi
+
+    if [[ ! -d "${target_project}" ]]; then
+        error "doctor project directory does not exist: ${target_project}"
+        return 1
+    fi
+
+    target_project="$(realpath "${target_project}")"
+    PROJECT_DIR="${target_project}"
+
+    init_projection_paths
+    GAETA_META_ENABLED=1
+    mkdir -p "${GAETA_PROJECTION_DIR}" 2>/dev/null || true
+
+    local fail_count=0
+    local warn_count=0
+
+    local opencode_bin_check="${OPENCODE_BIN:-${OPENCODE_BIN_DEFAULT}}"
+    local gaeta_config_dir="${HOME}/.config/gaeta"
+    local opencode_config_dir="${HOME}/.config/opencode"
+
+    local gaeta_opencode_json="${gaeta_config_dir}/opencode.json"
+    local opencode_opencode_json="${opencode_config_dir}/opencode.json"
+    local gaeta_tui_json="${gaeta_config_dir}/tui.json"
+    local opencode_tui_json="${opencode_config_dir}/tui.json"
+
+    local gaeta_agents_dir="${gaeta_config_dir}/agents"
+    local opencode_agents_dir="${opencode_config_dir}/agents"
+    local gaeta_commands_dir="${gaeta_config_dir}/commands"
+    local opencode_commands_dir="${opencode_config_dir}/commands"
+    local gaeta_modes_dir="${gaeta_config_dir}/modes"
+    local opencode_modes_dir="${opencode_config_dir}/modes"
+    local gaeta_plugins_dir="${gaeta_config_dir}/plugins"
+    local opencode_plugins_dir="${opencode_config_dir}/plugins"
+
+    local projection_dir="${target_project}/.gaeta/projection"
+    local projection_meta="${projection_dir}/projection.json"
+
+    local opencode_mode
+    local tui_mode
+    local agents_mode
+    local commands_mode
+    local modes_mode
+    local plugins_mode
+
+    opencode_mode=$(detect_file_source_mode "${gaeta_opencode_json}" "${opencode_opencode_json}")
+    tui_mode=$(detect_file_source_mode "${gaeta_tui_json}" "${opencode_tui_json}")
+    agents_mode=$(detect_dir_source_mode "${gaeta_agents_dir}" "${opencode_agents_dir}")
+    commands_mode=$(detect_dir_source_mode "${gaeta_commands_dir}" "${opencode_commands_dir}")
+    modes_mode=$(detect_dir_source_mode "${gaeta_modes_dir}" "${opencode_modes_dir}")
+    plugins_mode=$(detect_dir_source_mode "${gaeta_plugins_dir}" "${opencode_plugins_dir}")
+
+    local projection_refresh_state="ok"
+    local projection_refresh_details="refreshed projection artifacts"
+    if ! prepare_projection_artifacts; then
+        projection_refresh_state="warn"
+        projection_refresh_details="failed to refresh projection artifacts"
+        ((warn_count += 1))
+    fi
+
+    printf 'gaeta doctor\n'
+    printf '  project: %s\n' "${target_project}"
+    printf '\n'
+
+    printf 'Dependencies\n'
+    if command -v bwrap >/dev/null 2>&1; then
+        print_doctor_check "bwrap" "ok" "available"
+    else
+        print_doctor_check "bwrap" "fail" "missing (required for sandbox mode)"
+        ((fail_count += 1))
+    fi
+
+    if command -v python3 >/dev/null 2>&1; then
+        print_doctor_check "python3" "ok" "available"
+    else
+        print_doctor_check "python3" "fail" "missing (required for projection merges)"
+        ((fail_count += 1))
+    fi
+
+    if command -v "${opencode_bin_check}" >/dev/null 2>&1; then
+        print_doctor_check "opencode" "ok" "available as ${opencode_bin_check}"
+    else
+        print_doctor_check "opencode" "fail" "binary not found: ${opencode_bin_check}"
+        ((fail_count += 1))
+    fi
+
+    if command -v mdt >/dev/null 2>&1; then
+        print_doctor_check "mdt" "ok" "available"
+    else
+        print_doctor_check "mdt" "warn" "not installed (gaeta tasks fallback will be used)"
+        ((warn_count += 1))
+    fi
+
+    if command -v landrun >/dev/null 2>&1; then
+        print_doctor_check "landrun" "ok" "available (paranoid mode possible)"
+    else
+        print_doctor_check "landrun" "warn" "not installed (bubblewrap-only mode)"
+        ((warn_count += 1))
+    fi
+
+    printf '\n'
+    printf 'Config Sources\n'
+    print_doctor_check "opencode.json" "ok" "mode=${opencode_mode} gaeta=${gaeta_opencode_json} opencode=${opencode_opencode_json}"
+    print_doctor_check "tui.json" "ok" "mode=${tui_mode} gaeta=${gaeta_tui_json} opencode=${opencode_tui_json}"
+
+    printf '\n'
+    printf 'Directory Sources\n'
+    print_doctor_check "agents" "ok" "mode=${agents_mode} gaeta=${gaeta_agents_dir} opencode=${opencode_agents_dir}"
+    print_doctor_check "commands" "ok" "mode=${commands_mode} gaeta=${gaeta_commands_dir} opencode=${opencode_commands_dir}"
+    print_doctor_check "modes" "ok" "mode=${modes_mode} gaeta=${gaeta_modes_dir} opencode=${opencode_modes_dir}"
+    print_doctor_check "plugins" "ok" "mode=${plugins_mode} gaeta=${gaeta_plugins_dir} opencode=${opencode_plugins_dir}"
+
+    printf '\n'
+    printf 'Projection Artifacts\n'
+    print_doctor_check "projection refresh" "${projection_refresh_state}" "${projection_refresh_details}"
+
+    if [[ -d "${projection_dir}" ]]; then
+        print_doctor_check "projection dir" "ok" "${projection_dir}"
+    else
+        print_doctor_check "projection dir" "warn" "missing (run gaeta once to generate projection)"
+        ((warn_count += 1))
+    fi
+
+    if [[ -f "${projection_meta}" ]]; then
+        print_doctor_check "projection.json" "ok" "${projection_meta}"
+    else
+        print_doctor_check "projection.json" "warn" "missing"
+        ((warn_count += 1))
+    fi
+
+    local projected_opencode_json="${projection_dir}/opencode.json"
+    local projected_tui_json="${projection_dir}/tui.json"
+    local projected_agents_dir="${projection_dir}/agents"
+    local projected_commands_dir="${projection_dir}/commands"
+    local projected_modes_dir="${projection_dir}/modes"
+    local projected_plugins_dir="${projection_dir}/plugins"
+
+    if [[ "${opencode_mode}" != "none" && ! -f "${projected_opencode_json}" ]]; then
+        print_doctor_check "projected opencode" "warn" "expected but missing: ${projected_opencode_json}"
+        ((warn_count += 1))
+    elif [[ -f "${projected_opencode_json}" ]]; then
+        print_doctor_check "projected opencode" "ok" "${projected_opencode_json}"
+    fi
+
+    if [[ "${tui_mode}" != "none" && ! -f "${projected_tui_json}" ]]; then
+        print_doctor_check "projected tui" "warn" "expected but missing: ${projected_tui_json}"
+        ((warn_count += 1))
+    elif [[ -f "${projected_tui_json}" ]]; then
+        print_doctor_check "projected tui" "ok" "${projected_tui_json}"
+    fi
+
+    if [[ "${agents_mode}" != "none" && ! -d "${projected_agents_dir}" ]]; then
+        print_doctor_check "projected agents" "warn" "expected but missing: ${projected_agents_dir}"
+        ((warn_count += 1))
+    elif [[ -d "${projected_agents_dir}" ]]; then
+        print_doctor_check "projected agents" "ok" "${projected_agents_dir}"
+    fi
+
+    if [[ "${commands_mode}" != "none" && ! -d "${projected_commands_dir}" ]]; then
+        print_doctor_check "projected commands" "warn" "expected but missing: ${projected_commands_dir}"
+        ((warn_count += 1))
+    elif [[ -d "${projected_commands_dir}" ]]; then
+        print_doctor_check "projected commands" "ok" "${projected_commands_dir}"
+    fi
+
+    if [[ "${modes_mode}" != "none" && ! -d "${projected_modes_dir}" ]]; then
+        print_doctor_check "projected modes" "warn" "expected but missing: ${projected_modes_dir}"
+        ((warn_count += 1))
+    elif [[ -d "${projected_modes_dir}" ]]; then
+        print_doctor_check "projected modes" "ok" "${projected_modes_dir}"
+    fi
+
+    if [[ "${plugins_mode}" != "none" && ! -d "${projected_plugins_dir}" ]]; then
+        print_doctor_check "projected plugins" "warn" "expected but missing: ${projected_plugins_dir}"
+        ((warn_count += 1))
+    elif [[ -d "${projected_plugins_dir}" ]]; then
+        print_doctor_check "projected plugins" "ok" "${projected_plugins_dir}"
+    fi
+
+    printf '\n'
+    printf 'Sandbox Check\n'
+    if command -v bwrap >/dev/null 2>&1; then
+        local sandbox_output=""
+        if sandbox_output=$("${GAETA_SELF_PATH}" -q -b /bin/bash "${target_project}" -- -lc 'test -d /home/gaeta/.config/opencode && echo GAETA_DOCTOR_SANDBOX_OK' 2>&1); then
+            if [[ "${sandbox_output}" == *"GAETA_DOCTOR_SANDBOX_OK"* ]]; then
+                print_doctor_check "sandbox execution" "ok" "gaeta launch succeeded in sandbox"
+            else
+                print_doctor_check "sandbox execution" "warn" "sandbox launched but verification marker missing"
+                ((warn_count += 1))
+            fi
+        else
+            print_doctor_check "sandbox execution" "warn" "sandbox check failed: ${sandbox_output}"
+            ((warn_count += 1))
+        fi
+    else
+        print_doctor_check "sandbox execution" "warn" "bwrap not available; skipped"
+        ((warn_count += 1))
+    fi
+
+    local workflow_status="${target_project}/docs/.gaeta/status.md"
+    local workflow_checklist="${target_project}/docs/.gaeta/checklist.md"
+    local workflow_backlog="${target_project}/docs/.gaeta/backlog.md"
+    local workflow_phases="${target_project}/docs/.gaeta/phases.md"
+
+    printf '\n'
+    printf 'Workflow Files\n'
+    if [[ -f "${workflow_phases}" ]]; then
+        print_doctor_check "phases.md" "ok" "${workflow_phases}"
+    else
+        print_doctor_check "phases.md" "warn" "missing"
+        ((warn_count += 1))
+    fi
+
+    if [[ -f "${workflow_status}" ]]; then
+        print_doctor_check "status.md" "ok" "${workflow_status}"
+    else
+        print_doctor_check "status.md" "warn" "missing"
+        ((warn_count += 1))
+    fi
+
+    if [[ -f "${workflow_checklist}" ]]; then
+        print_doctor_check "checklist.md" "ok" "${workflow_checklist}"
+    else
+        print_doctor_check "checklist.md" "warn" "missing"
+        ((warn_count += 1))
+    fi
+
+    if [[ -f "${workflow_backlog}" ]]; then
+        print_doctor_check "backlog.md" "ok" "${workflow_backlog}"
+    else
+        print_doctor_check "backlog.md" "warn" "missing"
+        ((warn_count += 1))
+    fi
+
+    printf '\n'
+    printf 'Summary\n'
+    printf '  fail=%s warn=%s\n' "${fail_count}" "${warn_count}"
+
+    if [[ "${fail_count}" -gt 0 ]]; then
+        return 1
+    fi
+    return 0
+}
+
 update_phase() {
     local phase="$1"
     if [[ "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
@@ -532,15 +1098,11 @@ EOF
 
 init_metadata_dir() {
     GAETA_META_ENABLED=0
-    GAETA_META_DIR="${PROJECT_DIR}/.gaeta"
+    init_projection_paths
     GAETA_SESSION_LOG="${GAETA_META_DIR}/session.log"
     GAETA_PHASE_FILE="${GAETA_META_DIR}/phase"
     GAETA_COMMAND_JSON="${GAETA_META_DIR}/command.json"
     GAETA_APPROVAL_LOG="${GAETA_META_DIR}/approval.log"
-    GAETA_PROJECTION_DIR="${GAETA_META_DIR}/projection"
-    GAETA_PROJECTION_META="${GAETA_PROJECTION_DIR}/projection.json"
-    GAETA_PROJECTED_OPENCODE_JSON="${GAETA_PROJECTION_DIR}/opencode.json"
-    GAETA_PROJECTED_TUI_JSON="${GAETA_PROJECTION_DIR}/tui.json"
 
     if mkdir -p "${GAETA_META_DIR}" 2>/dev/null; then
         GAETA_META_ENABLED=1
@@ -971,10 +1533,35 @@ GAETA_CONFIG="${HOME}/.config/gaeta/opencode.json"
 OPENCODE_DEFAULT_CONFIG="${HOME}/.config/opencode/opencode.json"
 GAETA_TUI_CONFIG="${HOME}/.config/gaeta/tui.json"
 OPENCODE_DEFAULT_TUI_CONFIG="${HOME}/.config/opencode/tui.json"
+GAETA_AGENTS_DIR="${HOME}/.config/gaeta/agents"
+OPENCODE_AGENTS_DIR="${HOME}/.config/opencode/agents"
+GAETA_COMMANDS_DIR="${HOME}/.config/gaeta/commands"
+OPENCODE_COMMANDS_DIR="${HOME}/.config/opencode/commands"
+GAETA_MODES_DIR="${HOME}/.config/gaeta/modes"
+OPENCODE_MODES_DIR="${HOME}/.config/opencode/modes"
+GAETA_PLUGINS_DIR="${HOME}/.config/gaeta/plugins"
+OPENCODE_PLUGINS_DIR="${HOME}/.config/opencode/plugins"
 MERGED_CONFIG_DIR=""
+PROJECTED_AGENTS_DIR=""
+PROJECTED_COMMANDS_DIR=""
+PROJECTED_MODES_DIR=""
+PROJECTED_PLUGINS_DIR=""
+PROJECTED_AGENTS_SOURCE="none"
+PROJECTED_COMMANDS_SOURCE="none"
+PROJECTED_MODES_SOURCE="none"
+PROJECTED_PLUGINS_SOURCE="none"
 
 PROJECT_DIR=""
 OPENCODE_ARGS=()
+
+# Command dispatch: gaeta doctor ...
+if [[ "${1:-}" == "doctor" ]]; then
+    shift
+    if ! run_doctor_command "$@"; then
+        exit 1
+    fi
+    exit 0
+fi
 
 # Command dispatch: gaeta tasks ...
 if [[ "${1:-}" == "tasks" ]]; then
@@ -1181,25 +1768,9 @@ if [[ "${REQUIRE_LANDLOCK}" -eq 1 ]]; then
     append_approval_log "--require-landlock enabled"
 fi
 
-# Ensure OpenCode data/cache dirs exist (config handled separately)
-OPENCODE_DATA="${HOME}/.local/share/opencode"
-OPENCODE_CACHE="${HOME}/.cache/opencode"
-mkdir -p "${OPENCODE_DATA}/sessions"
-mkdir -p "${OPENCODE_DATA}/permissions"
-mkdir -p "${OPENCODE_CACHE}"
-
-MERGED_CONFIG_DIR="${OPENCODE_CACHE}/gaeta-merged"
-mkdir -p "${MERGED_CONFIG_DIR}"
-
-if ! CUSTOM_CONFIG=$(select_overlay_config "opencode.json" "${GAETA_CONFIG}" "${OPENCODE_DEFAULT_CONFIG}" "${MERGED_CONFIG_DIR}/opencode.json"); then
+if ! prepare_projection_artifacts; then
     exit 1
 fi
-
-if ! TUI_CONFIG=$(select_overlay_config "tui.json" "${GAETA_TUI_CONFIG}" "${OPENCODE_DEFAULT_TUI_CONFIG}" "${MERGED_CONFIG_DIR}/tui.json"); then
-    exit 1
-fi
-
-materialize_projection_files "${CUSTOM_CONFIG}" "${TUI_CONFIG}"
 
 # Network flags
 NET_FLAGS=()
@@ -1464,6 +2035,26 @@ if [[ -n "${TUI_CONFIG}" ]]; then
     info "Using TUI config: ${TUI_CONFIG}"
 else
     info "No tui.json config found, OpenCode TUI will use defaults"
+fi
+
+if [[ -n "${PROJECTED_AGENTS_DIR}" && -d "${PROJECTED_AGENTS_DIR}" ]]; then
+    BWRAP_CMD+=(--ro-bind "${PROJECTED_AGENTS_DIR}" /home/gaeta/.config/opencode/agents)
+    info "Using projected agents directory: ${PROJECTED_AGENTS_DIR}"
+fi
+
+if [[ -n "${PROJECTED_COMMANDS_DIR}" && -d "${PROJECTED_COMMANDS_DIR}" ]]; then
+    BWRAP_CMD+=(--ro-bind "${PROJECTED_COMMANDS_DIR}" /home/gaeta/.config/opencode/commands)
+    info "Using projected commands directory: ${PROJECTED_COMMANDS_DIR}"
+fi
+
+if [[ -n "${PROJECTED_MODES_DIR}" && -d "${PROJECTED_MODES_DIR}" ]]; then
+    BWRAP_CMD+=(--ro-bind "${PROJECTED_MODES_DIR}" /home/gaeta/.config/opencode/modes)
+    info "Using projected modes directory: ${PROJECTED_MODES_DIR}"
+fi
+
+if [[ -n "${PROJECTED_PLUGINS_DIR}" && -d "${PROJECTED_PLUGINS_DIR}" ]]; then
+    BWRAP_CMD+=(--ro-bind "${PROJECTED_PLUGINS_DIR}" /home/gaeta/.config/opencode/plugins)
+    info "Using projected plugins directory: ${PROJECTED_PLUGINS_DIR}"
 fi
 
 BWRAP_CMD+=(--chdir "${SANDBOX_WORKDIR}")

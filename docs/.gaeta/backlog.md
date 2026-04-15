@@ -6,3 +6,4 @@
 - [ ] Add threat model document.
 - [ ] Add fixture repository layout.
 - [ ] Add migration note for projects using `docs/.opencode`.
+- [ ] Add a standard lint entrypoint (`make lint` or documented equivalent script).

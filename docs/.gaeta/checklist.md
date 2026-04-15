@@ -8,7 +8,8 @@
 - [x] Add key-level config merge behavior (`gaeta` overrides `opencode` for JSON/YAML config files).
 - [x] Add `.gaeta/` runtime metadata (`phase`, `command.json`, `session.log`, `approval.log`).
 - [x] Implement generated `opencode.json` projection from gaeta-managed config.
-- [ ] Implement projection for `agents/`, `commands/`, `modes/`, and `plugins/`.
+- [x] Implement projection for `agents/`, `commands/`, `modes/`, and `plugins/`.
+- [x] Add `gaeta doctor` self-inspection command for config/projection/workflow health.
 - [ ] Add methodology-enforced agent instructions per phase.
 - [ ] Add checklist/status sync behavior for gaeta workflow files.
 - [x] Add `gaeta tasks` command flow using `mdt` with graceful fallback.

@@ -5,15 +5,15 @@
 - Name: gaeta
 - Direction: OpenCode-safe wrapper with phase-driven, methodology-enforced agent workflow.
 - Current phase: Phase 0 -> Phase 1 handoff.
-- Current sprint: directory projection contract + workflow sync integration.
+- Current sprint: workflow sync + methodology enforcement integration.
+- Diagnostics: `gaeta doctor` available for self-inspection.
 
 ## Next Step
 
-Implement directory projection for `agents/`, `commands/`, `modes/`, and `plugins/`, starting with a safety contract for symlink vs mirror behavior.
+Implement checklist/status sync behavior for gaeta workflow files, then add methodology-enforced agent instructions per phase.
 
 ## Blockers
 
-- Projection safety contract for symlink vs mirror is not frozen.
 - Approval-gated evolution proposal format is not frozen.
 
 ## Canonical Workflow Files
