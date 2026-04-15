@@ -5,6 +5,8 @@
 This document pack is for building **gaeta** as an OpenCode-safe wrapper with
 phase-driven, methodology-enforced workflow control.
 
+`gaeta` means **Guided Assistant Engineered Taskflow Agent**.
+
 The target model is:
 
 - `~/.config/gaeta/` is the source of truth.

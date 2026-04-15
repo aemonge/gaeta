@@ -22,6 +22,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - `gaeta doctor --json` now emits machine-readable output for repeatable validation and TDD automation.
 - `make lint` and `make test` now exist; test flow prefers `bats` and falls back to shell script validation for doctor JSON and config inheritance, with shellharden checks on hardened test scripts.
 - `make build` now installs a lean config bundle to `~/.config/gaeta` (`opencode.json` and `commands/handoff.md`, plus optional `tui.json` when present).
+- `README.md` now expands the gaeta acronym as "Guided Assistant Engineered Taskflow Agent" for clearer project naming context.
 - `make lint`/`make test` now provide colored, explicit status markers for check outcomes.
 - Interactive sessions now default to TTY compatibility mode (better resize/redraw behavior), with strict session isolation opt-in via `--strict-tty`.
 - `gaeta resume` (`gaeta r`) now launches a resumed gaeta session using OpenCode `--agent plan` plus a read-only handoff `--prompt`, with `--show` for dry-run visibility.

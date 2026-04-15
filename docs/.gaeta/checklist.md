@@ -14,6 +14,7 @@
 - [x] Add `make lint` and `make test` entrypoints (doctor JSON + config inheritance validation).
 - [x] Add `make build` config install target for `~/.config/gaeta` (`opencode.json` + `commands/handoff.md`).
 - [x] Improve `make lint`/`make test` UX with colored status output and explicit check markers.
+- [x] Document the GAETA acronym expansion in `README.md`.
 - [x] Add interactive TTY compatibility mode by default with strict opt-in (`--strict-tty`).
 - [x] Add `gaeta resume` / `gaeta r` helper to continue from documented phase/context.
 - [x] Set resume launcher defaults to OpenCode `--agent plan` and refine handoff prompt quality.
