@@ -50,7 +50,7 @@ The goal is "compose a stricter, more opinionated operator layer around OpenCode
 The current wrapper already proves the core direction:
 - Bubblewrap sandboxing is the primary isolation layer.
 - Landlock via `landrun` is optional defense-in-depth.
-- `~/.config/gaeta/gaeta.json` should take precedence over `~/.config/opencode/opencode.json`.
+- `~/.config/gaeta/opencode.json` and `~/.config/gaeta/tui.json` should merge over equivalent files in `~/.config/opencode/` with gaeta key-level precedence.
 - Metadata already exists conceptually via phase/session/approval logs.
 - The wrapper already binds a synthetic home and overlays OpenCode config into sandbox-visible paths.
 

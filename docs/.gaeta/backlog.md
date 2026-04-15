@@ -1,6 +1,6 @@
 # Backlog
 
-- [ ] Add sample `gaeta.json` and generated `opencode.json` pair.
+- [ ] Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
 - [ ] Add projection safety matrix for symlink vs mirror decisions.
 - [ ] Add Linux/macOS portability notes.
 - [ ] Add threat model document.

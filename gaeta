@@ -70,10 +70,18 @@ Protected Directories (read-only by default):
   .gitignore, package-lock.json, poetry.lock, Cargo.lock, .github/
 
 Config Precedence (automatic):
-  1. ~/.config/gaeta/gaeta.json (if exists)
-  2. ~/.config/scoder/scoder.json (migration fallback)
+  1. Merge ~/.config/opencode/opencode.json + ~/.config/gaeta/opencode.json
+     (gaeta keys override opencode keys, recursively)
+  2. ~/.config/gaeta/opencode.json (if exists)
   3. ~/.config/opencode/opencode.json (if exists)
   4. No config binding (OpenCode defaults)
+
+TUI Config Precedence (automatic):
+  1. Merge ~/.config/opencode/tui.json + ~/.config/gaeta/tui.json
+     (gaeta keys override opencode keys, recursively)
+  2. ~/.config/gaeta/tui.json (if exists)
+  3. ~/.config/opencode/tui.json (if exists)
+  4. No TUI config binding (OpenCode defaults)
 
 Paranoid Mode (Defense-in-Depth):
   When landrun is available, gaeta uses two-layer sandbox:
@@ -99,7 +107,7 @@ Examples:
 
 Security Note:
   HOME is set to /home/gaeta on tmpfs (fully isolated from your real home).
-  OpenCode config is overlaid from gaeta/scoder/opencode config as single file.
+  OpenCode config files are overlaid from gaeta/opencode paths with key-level merge.
   Host tools are bound by default (use --allow-host-tools to be explicit).
   The project is writable by default, but critical infrastructure directories
   are protected read-only unless you explicitly opt in.
@@ -155,6 +163,114 @@ json_escape() {
     value=${value//\"/\\\"}
     value=${value//$'\n'/\\n}
     printf '%s' "${value}"
+}
+
+merge_structured_config_files() {
+    local base_file="$1"
+    local override_file="$2"
+    local output_file="$3"
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        error "python3 is required for config merge: ${override_file} over ${base_file}"
+        return 1
+    fi
+
+    python3 - "${base_file}" "${override_file}" "${output_file}" <<'PY'
+import json
+import pathlib
+import sys
+
+
+def deep_merge(base, override):
+    if isinstance(base, dict) and isinstance(override, dict):
+        merged = dict(base)
+        for key, value in override.items():
+            if key in merged:
+                merged[key] = deep_merge(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
+    return override
+
+
+def load_structured(path):
+    suffix = path.suffix.lower()
+    text = path.read_text(encoding="utf-8")
+    if suffix == ".json":
+        return json.loads(text), "json"
+    if suffix in {".yaml", ".yml"}:
+        try:
+            import yaml
+        except Exception as exc:  # pragma: no cover
+            raise RuntimeError(
+                f"YAML merge requires PyYAML for file: {path}"
+            ) from exc
+        return yaml.safe_load(text), "yaml"
+    raise RuntimeError(f"Unsupported config format: {path}")
+
+
+def dump_structured(path, data, fmt):
+    if fmt == "json":
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+        return
+    if fmt == "yaml":
+        try:
+            import yaml
+        except Exception as exc:  # pragma: no cover
+            raise RuntimeError(
+                f"YAML output requires PyYAML for file: {path}"
+            ) from exc
+        rendered = yaml.safe_dump(data, sort_keys=False)
+        path.write_text(rendered, encoding="utf-8")
+        return
+    raise RuntimeError(f"Unsupported output format: {fmt}")
+
+
+base_path = pathlib.Path(sys.argv[1])
+override_path = pathlib.Path(sys.argv[2])
+output_path = pathlib.Path(sys.argv[3])
+
+base_data, base_fmt = load_structured(base_path)
+override_data, override_fmt = load_structured(override_path)
+
+if base_fmt != override_fmt:
+    raise RuntimeError(
+        f"Config format mismatch: {base_path.name} ({base_fmt}) vs {override_path.name} ({override_fmt})"
+    )
+
+merged = deep_merge(base_data, override_data)
+output_path.parent.mkdir(parents=True, exist_ok=True)
+dump_structured(output_path, merged, base_fmt)
+PY
+}
+
+select_overlay_config() {
+    local config_name="$1"
+    local gaeta_file="$2"
+    local opencode_file="$3"
+    local merged_file="$4"
+
+    if [[ -f "${gaeta_file}" && -f "${opencode_file}" ]]; then
+        if ! merge_structured_config_files "${opencode_file}" "${gaeta_file}" "${merged_file}"; then
+            error "failed to merge ${config_name}: ${gaeta_file} over ${opencode_file}"
+            return 1
+        fi
+        info "Using merged ${config_name} (gaeta precedence): ${gaeta_file} + ${opencode_file}"
+        printf '%s' "${merged_file}"
+        return 0
+    fi
+
+    if [[ -f "${gaeta_file}" ]]; then
+        printf '%s' "${gaeta_file}"
+        return 0
+    fi
+
+    if [[ -f "${opencode_file}" ]]; then
+        printf '%s' "${opencode_file}"
+        return 0
+    fi
+
+    printf ''
 }
 
 update_phase() {
@@ -311,9 +427,12 @@ translate_paths_to_landrun() {
     LANDRUN_PATH_RULES+=(--rwx "${OPENCODE_DATA}")
     LANDRUN_PATH_RULES+=(--rwx "${OPENCODE_CACHE}")
 
-    # Config file (if exists)
+    # Config files (if they exist)
     if [[ -n "${CUSTOM_CONFIG}" && -f "${CUSTOM_CONFIG}" ]]; then
         LANDRUN_PATH_RULES+=(--ro "${CUSTOM_CONFIG}")
+    fi
+    if [[ -n "${TUI_CONFIG}" && -f "${TUI_CONFIG}" ]]; then
+        LANDRUN_PATH_RULES+=(--ro "${TUI_CONFIG}")
     fi
 
     # Project directory (depends on FS_MODE)
@@ -519,21 +638,35 @@ run_validation() {
         ((failed_tests++))
     fi
 
-    # Test C: Config overlay (if gaeta.json exists)
-    if [[ -f "${GAETA_RELAXED_CONFIG}" ]]; then
+    # Test C: Config overlay (gaeta precedence with key-level merge)
+    if [[ -f "${GAETA_CONFIG}" || -f "${OPENCODE_DEFAULT_CONFIG}" ]]; then
         info "Test C: Config overlay verification"
         local config_read
         config_read=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'cat ~/.config/opencode/opencode.json 2>&1' 2>&1 || true)
         local expected_content
-        expected_content=$(cat "${GAETA_RELAXED_CONFIG}" 2>/dev/null || echo "")
+        if [[ -f "${GAETA_CONFIG}" && -f "${OPENCODE_DEFAULT_CONFIG}" ]]; then
+            local merged_expected
+            merged_expected="/tmp/gaeta-validation-merged-opencode-$$.json"
+            if merge_structured_config_files "${OPENCODE_DEFAULT_CONFIG}" "${GAETA_CONFIG}" "${merged_expected}"; then
+                expected_content=$(cat "${merged_expected}" 2>/dev/null || echo "")
+                rm -f "${merged_expected}"
+            else
+                expected_content=""
+            fi
+        elif [[ -f "${GAETA_CONFIG}" ]]; then
+            expected_content=$(cat "${GAETA_CONFIG}" 2>/dev/null || echo "")
+        else
+            expected_content=$(cat "${OPENCODE_DEFAULT_CONFIG}" 2>/dev/null || echo "")
+        fi
+
         if [[ "${config_read}" == "${expected_content}" ]]; then
-            echo "✅ Test C PASS: Config overlay works (gaeta.json content visible)"
+            echo "✅ Test C PASS: Config overlay works with gaeta precedence"
         else
             echo "❌ Test C FAIL: Config overlay mismatch"
             ((failed_tests++))
         fi
     else
-        echo "ℹ️  Test C SKIP: No gaeta.json found (${GAETA_RELAXED_CONFIG})"
+        echo "ℹ️  Test C SKIP: No opencode config found (${GAETA_CONFIG} or ${OPENCODE_DEFAULT_CONFIG})"
     fi
 
     # Test D: Tooling PATH
@@ -639,19 +772,14 @@ LANDRUN_AVAILABLE=0
 LANDLOCK_ABI_VERSION=0
 LANDRUN_BIN=""
 
-# Auto config selection (gaeta first, scoder migration fallback)
+# Config candidates (resolved after data/cache setup)
 CUSTOM_CONFIG=""
-GAETA_RELAXED_CONFIG="${HOME}/.config/gaeta/gaeta.json"
-SCODER_FALLBACK_CONFIG="${HOME}/.config/scoder/scoder.json"
+TUI_CONFIG=""
+GAETA_CONFIG="${HOME}/.config/gaeta/opencode.json"
 OPENCODE_DEFAULT_CONFIG="${HOME}/.config/opencode/opencode.json"
-
-if [[ -f "${GAETA_RELAXED_CONFIG}" ]]; then
-    CUSTOM_CONFIG="${GAETA_RELAXED_CONFIG}"
-elif [[ -f "${SCODER_FALLBACK_CONFIG}" ]]; then
-    CUSTOM_CONFIG="${SCODER_FALLBACK_CONFIG}"
-elif [[ -f "${OPENCODE_DEFAULT_CONFIG}" ]]; then
-    CUSTOM_CONFIG="${OPENCODE_DEFAULT_CONFIG}"
-fi
+GAETA_TUI_CONFIG="${HOME}/.config/gaeta/tui.json"
+OPENCODE_DEFAULT_TUI_CONFIG="${HOME}/.config/opencode/tui.json"
+MERGED_CONFIG_DIR=""
 
 PROJECT_DIR=""
 OPENCODE_ARGS=()
@@ -858,6 +986,17 @@ OPENCODE_CACHE="${HOME}/.cache/opencode"
 mkdir -p "${OPENCODE_DATA}/sessions"
 mkdir -p "${OPENCODE_DATA}/permissions"
 mkdir -p "${OPENCODE_CACHE}"
+
+MERGED_CONFIG_DIR="${OPENCODE_CACHE}/gaeta-merged"
+mkdir -p "${MERGED_CONFIG_DIR}"
+
+if ! CUSTOM_CONFIG=$(select_overlay_config "opencode.json" "${GAETA_CONFIG}" "${OPENCODE_DEFAULT_CONFIG}" "${MERGED_CONFIG_DIR}/opencode.json"); then
+    exit 1
+fi
+
+if ! TUI_CONFIG=$(select_overlay_config "tui.json" "${GAETA_TUI_CONFIG}" "${OPENCODE_DEFAULT_TUI_CONFIG}" "${MERGED_CONFIG_DIR}/tui.json"); then
+    exit 1
+fi
 
 # Network flags
 NET_FLAGS=()
@@ -1101,7 +1240,7 @@ BWRAP_CMD+=(
     --bind "${OPENCODE_CACHE}" /home/gaeta/.cache/opencode
 )
 
-# Config overlay: ONLY bind the specific config file, not the directory
+# Config overlay: ONLY bind specific config files, not the directory
 if [[ -n "${CUSTOM_CONFIG}" ]]; then
     if [[ ! -f "${CUSTOM_CONFIG}" ]]; then
         error "Selected config file not found: ${CUSTOM_CONFIG}"
@@ -1110,7 +1249,18 @@ if [[ -n "${CUSTOM_CONFIG}" ]]; then
     BWRAP_CMD+=(--ro-bind "${CUSTOM_CONFIG}" /home/gaeta/.config/opencode/opencode.json)
     info "Using config: ${CUSTOM_CONFIG}"
 else
-    info "No custom config found, OpenCode will use defaults"
+    info "No opencode.json config found, OpenCode will use defaults"
+fi
+
+if [[ -n "${TUI_CONFIG}" ]]; then
+    if [[ ! -f "${TUI_CONFIG}" ]]; then
+        error "Selected TUI config file not found: ${TUI_CONFIG}"
+        exit 1
+    fi
+    BWRAP_CMD+=(--ro-bind "${TUI_CONFIG}" /home/gaeta/.config/opencode/tui.json)
+    info "Using TUI config: ${TUI_CONFIG}"
+else
+    info "No tui.json config found, OpenCode TUI will use defaults"
 fi
 
 BWRAP_CMD+=(--chdir "${SANDBOX_WORKDIR}")

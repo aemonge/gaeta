@@ -13,14 +13,14 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - The existing wrapper already supports bubblewrap sandboxing.
 - Landlock via `landrun` is optional defense-in-depth.
 - Wrapper entrypoint is now `./gaeta` (repo-local `./scoder` retired).
-- Config precedence now prefers `~/.config/gaeta/gaeta.json`, with fallback to `~/.config/scoder/scoder.json` and then OpenCode default config.
+- Config precedence now uses key-level merge for `opencode.json`/`tui.json` (gaeta overrides OpenCode defaults when both exist).
 - Runtime metadata is now written under `./.gaeta/` (`phase`, `command.json`, `session.log`, `approval.log`).
 - Repo docs were previously split/inconsistent; canonical workflow location is now `docs/.gaeta/`.
 - Legacy root/reference files were archived under `docs/references/` to reduce root noise.
 
 ## In progress
 
-- Implement generated `opencode.json` projection from `gaeta.json`.
+- Implement generated `opencode.json` projection from gaeta-managed config.
 - Implement directory projection for agents/commands/modes/plugins.
 - Define commit-sized implementation slices with human checkpoints.
 - Implement `gaeta tasks` flow with `mdt` + graceful fallback.
@@ -34,12 +34,14 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Implement `gaeta tasks` command behavior around `mdt` with graceful fallback, then continue minimal projection output (`gaeta.json` -> generated `opencode.json`) with `projection.json` metadata.
+Implement `gaeta tasks` command behavior around `mdt` with graceful fallback, then continue minimal projection output (gaeta-managed config -> generated `opencode.json`) with `projection.json` metadata.
 
 ## Decisions
 
 - gaeta is a wrapper, not a fork.
-- `~/.config/gaeta/` is canonical (with migration compatibility from scoder during transition).
+- `~/.config/gaeta/` is canonical and uses OpenCode-compatible config naming (`opencode.json`, `tui.json`).
+- Legacy `gaeta.json`/`scoder.json` config fallbacks are removed to keep config behavior explicit and clean.
+- Config merge semantics are recursive key-level overlay: OpenCode base + gaeta override for JSON/YAML structured config.
 - `docs/.gaeta/` is the canonical repository workflow control plane.
 - Markdown checklists are the workflow task system.
 - Self-updating behavior is approval-gated only.

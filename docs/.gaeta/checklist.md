@@ -4,9 +4,10 @@
 
 - [x] Add `./gaeta` executable and switch wrapper identity from scoder to gaeta.
 - [x] Retire repo-local `./scoder` entrypoint.
-- [x] Add `gaeta`-first config resolution with OpenCode compatibility fallback.
+- [x] Add `gaeta`-namespace config resolution with OpenCode-compatible naming (`opencode.json`, `tui.json`).
+- [x] Add key-level config merge behavior (`gaeta` overrides `opencode` for JSON/YAML config files).
 - [x] Add `.gaeta/` runtime metadata (`phase`, `command.json`, `session.log`, `approval.log`).
-- [ ] Implement generated `opencode.json` projection from `gaeta.json`.
+- [ ] Implement generated `opencode.json` projection from gaeta-managed config.
 - [ ] Implement projection for `agents/`, `commands/`, `modes/`, and `plugins/`.
 - [ ] Add methodology-enforced agent instructions per phase.
 - [ ] Add checklist/status sync behavior for gaeta workflow files.
