@@ -54,15 +54,36 @@ JSON
 MD
 
   cat >"${TEST_PROJECT}/docs/.gaeta/status.md" <<'MD'
-# status
+# Status
+
+## Current phase
+
+Phase X
+
+## Next step
+
+Implement sync behavior.
 MD
 
   cat >"${TEST_PROJECT}/docs/.gaeta/checklist.md" <<'MD'
-# checklist
+# Checklist
+
+## Current Sprint
+
+- [ ] Implement sync behavior.
+- [ ] Add methodology-enforced instructions.
 MD
 
   cat >"${TEST_PROJECT}/docs/.gaeta/backlog.md" <<'MD'
 # backlog
+MD
+
+  cat >"${TEST_PROJECT}/PROJECT.md" <<'MD'
+# PROJECT
+
+## Resume Prompt
+
+`continue from resume helper output`
 MD
 }
 
@@ -121,4 +142,18 @@ assert projected_tui["keybinds"]["quit"] == "ctrl+q", projected_tui
 PY
 
   [ "$status" -eq 0 ]
+}
+
+@test "resume and r show launch prompt context" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gaeta resume"* ]]
+  [[ "$output" == *"launch:"* ]]
+  [[ "$output" == *"--agent plan"* ]]
+  [[ "$output" == *"--prompt"* ]]
+  [[ "$output" == *"continue from resume helper output"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" r --show "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gaeta resume"* ]]
 }

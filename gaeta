@@ -27,11 +27,14 @@ Safe OpenCode wrapper using bubblewrap with optional Landlock defense-in-depth.
 
 Usage:
   gaeta doctor [PROJECT_DIR]
+  gaeta resume [--show] [PROJECT_DIR]
+  gaeta r [--show] [PROJECT_DIR]
   gaeta tasks [TASK_ARGS...]
   gaeta [options] [PROJECT_DIR] [-- [OPENCODE_ARGS...]]
 
 Options:
   doctor                 Run gaeta self-inspection checks
+  resume, r              Show phase/next-step resume context
   tasks                  Run task workflow via mdt (with fallback)
   -h, --help              Show this help and exit
   -V, --version           Show version and exit
@@ -76,6 +79,7 @@ Environment:
   GAETA_TASKS_FORCE_FALLBACK  "1" to bypass mdt and use built-in tasks fallback
   GAETA_DOCTOR_SKIP_SANDBOX   "1" to skip nested sandbox check in gaeta doctor
   GAETA_TTY_MODE         "auto" (default), "compat", or "strict"
+  GAETA_RESUME_AGENT     Resume agent name (default: "plan")
 
 Protected Directories (read-only by default):
   .git, .turbo, .next, dist, build, target, .cargo
@@ -118,6 +122,10 @@ Examples:
   gaeta doctor             # inspect gaeta config and projection health
   gaeta doctor --json      # inspect gaeta health as JSON
   gaeta doctor ../repo     # inspect another project
+  gaeta resume             # launch opencode with resume prompt
+  gaeta resume --show      # show resolved resume command without launching
+  GAETA_RESUME_AGENT=plan gaeta r --show # preview resume agent launch
+  gaeta r                  # short alias for resume
   gaeta tasks              # run mdt in docs/.gaeta (or fallback view)
   gaeta tasks -m           # add multiple tasks via mdt
   gaeta                    # rw sandbox of $PWD, infra protected, paranoid if available
@@ -611,8 +619,99 @@ contains_option() {
     return 1
 }
 
+sync_status_from_checklist() {
+    local checklist_path="$1"
+    local status_path="$2"
+    local trigger="$3"
+
+    if [[ ! -f "${checklist_path}" ]]; then
+        warning "workflow sync skipped: checklist not found at ${checklist_path}"
+        return 0
+    fi
+
+    if [[ ! -f "${status_path}" ]]; then
+        warning "workflow sync skipped: status not found at ${status_path}"
+        return 0
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        warning "workflow sync skipped: python3 not available"
+        return 0
+    fi
+
+    if ! python3 - "${checklist_path}" "${status_path}" "${trigger}" <<'PY'
+import pathlib
+import re
+import sys
+
+
+def replace_or_append_section(text: str, heading: str, body: str) -> str:
+    header_pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.MULTILINE)
+    header_match = header_pattern.search(text)
+    section = f"## {heading}\n\n{body.strip()}\n"
+
+    if header_match is None:
+        base = text.rstrip()
+        if base:
+            return f"{base}\n\n{section}\n"
+        return f"{section}\n"
+
+    section_start = header_match.start()
+    content_start = header_match.end()
+    next_header = re.search(r"^##\s+", text[content_start:], re.MULTILINE)
+    if next_header is None:
+        return f"{text[:section_start].rstrip()}\n\n{section}\n"
+
+    section_end = content_start + next_header.start()
+    prefix = text[:section_start].rstrip()
+    suffix = text[section_end:].lstrip("\n")
+    if prefix:
+        return f"{prefix}\n\n{section}\n{suffix.rstrip()}\n"
+    return f"{section}\n{suffix.rstrip()}\n"
+
+
+checklist_path = pathlib.Path(sys.argv[1])
+status_path = pathlib.Path(sys.argv[2])
+trigger = sys.argv[3]
+
+checklist_text = checklist_path.read_text(encoding="utf-8")
+status_text = status_path.read_text(encoding="utf-8")
+
+pending = []
+in_current_sprint = False
+for raw in checklist_text.splitlines():
+    line = raw.strip()
+    if line.startswith("## "):
+        in_current_sprint = line == "## Current Sprint"
+        continue
+    if in_current_sprint and line.startswith("- [ ] "):
+        pending.append(line[6:].strip())
+
+if pending:
+    in_progress_body = "\n".join(f"- {item}" for item in pending[:3])
+    next_step_body = pending[0]
+else:
+    in_progress_body = "- No open checklist items in `## Current Sprint`."
+    next_step_body = "Review backlog and define the next checklist task."
+
+updated = replace_or_append_section(status_text, "In progress", in_progress_body)
+updated = replace_or_append_section(updated, "Next step", next_step_body)
+
+status_path.write_text(updated, encoding="utf-8")
+print(f"synced status from checklist ({trigger})")
+PY
+    then
+        warning "workflow sync failed for ${status_path}"
+        return 1
+    fi
+
+    info "synced workflow status from checklist (${trigger})"
+    return 0
+}
+
 run_tasks_fallback() {
     local checklist_path="$1"
+    local status_path="$2"
     shift
 
     local action="${1:-list}"
@@ -640,6 +739,7 @@ run_tasks_fallback() {
             printf '# Checklist\n\n## Current Sprint\n\n' >"${checklist_path}"
         fi
         printf -- '- [ ] %s\n' "$*" >>"${checklist_path}"
+        sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-fallback-add" || true
         info "added task to ${checklist_path}"
         return 0
         ;;
@@ -683,12 +783,17 @@ if not updated:
 
 path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 PY
+        sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-fallback-done" || true
         info "marked matching task as done in ${checklist_path}"
         return 0
         ;;
+    sync)
+        sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-fallback-sync"
+        return $?
+        ;;
     *)
         error "fallback task action not supported: ${action}"
-        error "supported fallback actions: list, path, add, done"
+        error "supported fallback actions: list, path, add, done, sync"
         return 1
         ;;
     esac
@@ -701,10 +806,11 @@ run_tasks_command() {
 
     local gaeta_dir="${project_dir}/docs/.gaeta"
     local checklist_path="${gaeta_dir}/checklist.md"
+    local status_path="${gaeta_dir}/status.md"
 
     if [[ ! -d "${gaeta_dir}" ]]; then
         warning "docs/.gaeta not found in ${project_dir}; using fallback mode"
-        run_tasks_fallback "${checklist_path}" "${task_args[@]}"
+        run_tasks_fallback "${checklist_path}" "${status_path}" "${task_args[@]}"
         return $?
     fi
 
@@ -718,11 +824,15 @@ run_tasks_command() {
         fi
         mdt_cmd+=("${task_args[@]}")
         info "Running tasks via mdt in ${gaeta_dir}"
-        exec "${mdt_cmd[@]}"
+        if ! "${mdt_cmd[@]}"; then
+            return 1
+        fi
+        sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-mdt"
+        return $?
     fi
 
     warning "mdt unavailable or fallback forced; using built-in fallback tasks mode"
-    run_tasks_fallback "${checklist_path}" "${task_args[@]}"
+    run_tasks_fallback "${checklist_path}" "${status_path}" "${task_args[@]}"
 }
 
 detect_file_source_mode() {
@@ -1218,6 +1328,149 @@ DOCTOR_HELP
         return 1
     fi
     return 0
+}
+
+run_resume_command() {
+    local target_project="${PWD}"
+    local show_only=0
+    local project_file
+    local status_file
+    local checklist_file
+    local resume_prompt
+    local opencode_bin
+    local resume_agent
+
+    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+        cat <<'RESUME_HELP'
+Usage:
+  gaeta resume [--show] [PROJECT_DIR]
+  gaeta r [--show] [PROJECT_DIR]
+
+Launches gaeta in the target project with a generated resume prompt.
+
+Options:
+  --show    Show resolved launch command and prompt without executing
+RESUME_HELP
+        return 0
+    fi
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --show)
+            show_only=1
+            shift
+            ;;
+        *)
+            if [[ "${target_project}" != "${PWD}" ]]; then
+                error "resume accepts at most one optional PROJECT_DIR"
+                return 1
+            fi
+            target_project="$1"
+            shift
+            ;;
+        esac
+    done
+
+    if [[ ! -d "${target_project}" ]]; then
+        error "resume project directory does not exist: ${target_project}"
+        return 1
+    fi
+
+    target_project="$(realpath "${target_project}")"
+    status_file="${target_project}/docs/.gaeta/status.md"
+    checklist_file="${target_project}/docs/.gaeta/checklist.md"
+    project_file="${target_project}/PROJECT.md"
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        error "python3 is required for resume parsing"
+        return 1
+    fi
+
+    resume_prompt=$(python3 - "${project_file}" "${status_file}" "${checklist_file}" <<'PY'
+import pathlib
+import re
+import sys
+
+
+def section_body(text: str, heading: str) -> str:
+    pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.MULTILINE)
+    match = pattern.search(text)
+    if not match:
+        return ""
+    start = match.end()
+    remaining = text[start:]
+    next_heading = re.search(r"^##\s+", remaining, re.MULTILINE)
+    if next_heading:
+        return remaining[: next_heading.start()].strip()
+    return remaining.strip()
+
+
+project_path = pathlib.Path(sys.argv[1])
+status_path = pathlib.Path(sys.argv[2])
+checklist_path = pathlib.Path(sys.argv[3])
+
+project_text = project_path.read_text(encoding="utf-8") if project_path.exists() else ""
+status_text = status_path.read_text(encoding="utf-8") if status_path.exists() else ""
+checklist_text = checklist_path.read_text(encoding="utf-8") if checklist_path.exists() else ""
+
+resume_prompt_body = section_body(project_text, "Resume Prompt")
+resume_prompt = ""
+for line in resume_prompt_body.splitlines():
+    line = line.strip()
+    if line.startswith("`") and line.endswith("`") and len(line) > 2:
+        resume_prompt = line.strip("`")
+        break
+
+if not resume_prompt:
+    phase_line = section_body(status_text, "Current phase").splitlines()
+    phase_value = phase_line[0].strip() if phase_line else "unknown"
+    next_step_line = section_body(status_text, "Next step").splitlines()
+    next_value = " ".join(line.strip() for line in next_step_line if line.strip()) if next_step_line else "(not defined)"
+
+    pending = []
+    in_current_sprint = False
+    for raw in checklist_text.splitlines():
+        line = raw.strip()
+        if line.startswith("## "):
+            in_current_sprint = line == "## Current Sprint"
+            continue
+        if in_current_sprint and line.startswith("- [ ] "):
+            pending.append(line[6:].strip())
+
+    resume_prompt = (
+        f"Phase: {phase_value}. Next: {next_value}. "
+        f"Pending sprint items: {', '.join(pending[:3]) if pending else 'none'}. "
+        "Read AGENTS.md and docs/.gaeta files plus PROJECT.md and GAETA.md. "
+        "Provide a read-only handoff summary and propose the first implementation slice and validation commands."
+    )
+
+print(resume_prompt)
+PY
+)
+
+if [[ -z "${resume_prompt}" ]]; then
+    error "failed to resolve resume prompt"
+    return 1
+fi
+
+    opencode_bin="${OPENCODE_BIN:-${OPENCODE_BIN_DEFAULT}}"
+    resume_agent="${GAETA_RESUME_AGENT:-plan}"
+
+    if [[ -z "${resume_agent}" ]]; then
+        resume_agent="plan"
+    fi
+
+    if [[ "${show_only}" -eq 1 ]]; then
+        printf 'gaeta resume\n'
+        printf '  project: %s\n' "${target_project}"
+        printf '  opencode: %s\n' "${opencode_bin}"
+        printf '  agent: %s\n' "${resume_agent}"
+        printf '  launch: %s %s -- --agent %s --prompt "%s"\n' "${GAETA_SELF_PATH}" "${target_project}" "${resume_agent}" "${resume_prompt}"
+        printf '\nResume prompt\n  %s\n' "${resume_prompt}"
+        return 0
+    fi
+
+    exec "${GAETA_SELF_PATH}" "${target_project}" -- --agent "${resume_agent}" --prompt "${resume_prompt}"
 }
 
 update_phase() {
@@ -1761,6 +2014,15 @@ OPENCODE_ARGS=()
 if [[ "${1:-}" == "doctor" ]]; then
     shift
     if ! run_doctor_command "$@"; then
+        exit 1
+    fi
+    exit 0
+fi
+
+# Command dispatch: gaeta resume / r ...
+if [[ "${1:-}" == "resume" || "${1:-}" == "r" ]]; then
+    shift
+    if ! run_resume_command "$@"; then
         exit 1
     fi
     exit 0

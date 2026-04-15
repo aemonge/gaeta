@@ -7,3 +7,4 @@
 - [ ] Add fixture repository layout.
 - [ ] Add migration note for projects using `docs/.opencode`.
 - [ ] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
+- [ ] Add `gaeta pause`/end-of-day handoff command to snapshot status, checklist, and resume context.

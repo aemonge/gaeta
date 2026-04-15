@@ -62,11 +62,28 @@ cat >"${TEST_PROJECT}/docs/.gaeta/phases.md" <<'MD'
 MD
 
 cat >"${TEST_PROJECT}/docs/.gaeta/status.md" <<'MD'
-# status
+# Status
+
+## Current phase
+
+Phase X
+
+## In progress
+
+- Implement sync behavior.
+
+## Next step
+
+Implement sync behavior.
 MD
 
 cat >"${TEST_PROJECT}/docs/.gaeta/checklist.md" <<'MD'
-# checklist
+# Checklist
+
+## Current Sprint
+
+- [ ] Implement sync behavior.
+- [ ] Add methodology-enforced instructions.
 MD
 
 cat >"${TEST_PROJECT}/docs/.gaeta/backlog.md" <<'MD'
