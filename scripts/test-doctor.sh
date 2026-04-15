@@ -75,7 +75,7 @@ MD
 
 DOCTOR_JSON_PATH="${TEST_ROOT}/doctor.json"
 
-HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --json "$TEST_PROJECT" >"$DOCTOR_JSON_PATH"
+HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat "$GAETA_BIN" doctor --json "$TEST_PROJECT" >"$DOCTOR_JSON_PATH"
 
 python3 - "$DOCTOR_JSON_PATH" "$TEST_PROJECT" <<'PY'
 import json
@@ -104,6 +104,10 @@ for key in [
 config_rows = {row["label"]: row for row in checks["config_sources"]}
 assert "mode=merged" in config_rows["opencode.json"]["details"], config_rows
 assert "mode=merged" in config_rows["tui.json"]["details"], config_rows
+
+sandbox_rows = {row["label"]: row for row in checks["sandbox_check"]}
+assert "mode=compat" in sandbox_rows["tty session policy"]["details"], sandbox_rows
+assert "skipped" in sandbox_rows["sandbox execution"]["details"], sandbox_rows
 
 projection_file = project / ".gaeta" / "projection" / "opencode.json"
 projection_tui = project / ".gaeta" / "projection" / "tui.json"

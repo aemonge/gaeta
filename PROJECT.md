@@ -7,6 +7,7 @@
 - Current phase: Phase 0 -> Phase 1 handoff.
 - Current sprint: workflow sync + methodology enforcement integration.
 - Diagnostics: `gaeta doctor` (human) and `gaeta doctor --json` (machine-readable) available for self-inspection, with `make lint`/`make test` entrypoints.
+- Terminal UX: interactive runs default to compatibility redraw mode; strict TTY isolation is opt-in via `--strict-tty`.
 
 ## Next Step
 

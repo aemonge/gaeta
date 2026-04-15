@@ -13,6 +13,7 @@
 - [x] Add `gaeta doctor --json` machine-readable output for validation/TDD workflows.
 - [x] Add `make lint` and `make test` entrypoints (doctor JSON + config inheritance validation).
 - [x] Improve `make lint`/`make test` UX with colored status output and explicit check markers.
+- [x] Add interactive TTY compatibility mode by default with strict opt-in (`--strict-tty`).
 - [ ] Add methodology-enforced agent instructions per phase.
 - [ ] Add checklist/status sync behavior for gaeta workflow files.
 - [x] Add `gaeta tasks` command flow using `mdt` with graceful fallback.

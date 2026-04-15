@@ -73,7 +73,7 @@ teardown() {
 @test "doctor --json includes populated checks and merged config" {
   local json_path="${TEST_ROOT}/doctor.json"
 
-  HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 \
+  HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat \
     "$GAETA_BIN" doctor --json "$TEST_PROJECT" >"$json_path"
 
   run python3 - "$json_path" "$TEST_PROJECT" <<'PY'
@@ -102,6 +102,10 @@ for key in [
 config_rows = {row["label"]: row for row in checks["config_sources"]}
 assert "mode=merged" in config_rows["opencode.json"]["details"], config_rows
 assert "mode=merged" in config_rows["tui.json"]["details"], config_rows
+
+sandbox_rows = {row["label"]: row for row in checks["sandbox_check"]}
+assert "mode=compat" in sandbox_rows["tty session policy"]["details"], sandbox_rows
+assert "skipped" in sandbox_rows["sandbox execution"]["details"], sandbox_rows
 
 projected_config = json.loads((project / ".gaeta" / "projection" / "opencode.json").read_text(encoding="utf-8"))
 projected_tui = json.loads((project / ".gaeta" / "projection" / "tui.json").read_text(encoding="utf-8"))

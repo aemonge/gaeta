@@ -49,6 +49,7 @@ Options:
       --quiet-landlock    Suppress Landlock fallback warnings
       --quite-landlock    Alias for --quiet-landlock
       --require-landlock  Fail if Landlock cannot be enabled
+      --strict-tty        Force strict TTY isolation mode (enables --new-session)
   --allow-host-tools  Bind host user tools (~/.local/bin, mise, pyenv, uv, rustup/cargo, etc) (default)
   --no-host-tools     Disable binding host user tools
 USAGE_EOF
@@ -74,6 +75,7 @@ Environment:
   GAETA_FS_MODE          "ro" (secure) or "rw" (default, allow writes)
   GAETA_TASKS_FORCE_FALLBACK  "1" to bypass mdt and use built-in tasks fallback
   GAETA_DOCTOR_SKIP_SANDBOX   "1" to skip nested sandbox check in gaeta doctor
+  GAETA_TTY_MODE         "auto" (default), "compat", or "strict"
 
 Protected Directories (read-only by default):
   .git, .turbo, .next, dist, build, target, .cargo
@@ -123,12 +125,15 @@ Examples:
   gaeta --ro               # read-only sandbox of $PWD
   gaeta --allow-git        # allow .git writes
   gaeta --allow-host-tools # bind host dev tools (mise, cargo, etc)
+  gaeta --strict-tty       # force strict TTY session isolation
   gaeta --not-paranoid     # disable Landlock layer (bubblewrap only)
   gaeta -n myproj -- --verbose # network off, pass --verbose to opencode
 
 Security Note:
   HOME is set to /home/gaeta on tmpfs (fully isolated from your real home).
   OpenCode config files are overlaid from gaeta/opencode paths with key-level merge.
+  Interactive runs default to TTY compatibility mode (no --new-session) to improve
+  redraw/resizing behavior; use --strict-tty for strict session isolation.
   Host tools are bound by default (use --allow-host-tools to be explicit).
   The project is writable by default, but critical infrastructure directories
   are protected read-only unless you explicitly opt in.
@@ -758,6 +763,45 @@ detect_dir_source_mode() {
     printf 'none'
 }
 
+determine_tty_session_mode() {
+    local requested_mode="${GAETA_TTY_MODE_REQUEST}"
+
+    TTY_INTERACTIVE=0
+    if [[ -t 0 && -t 1 ]]; then
+        TTY_INTERACTIVE=1
+    fi
+
+    if [[ "${STRICT_TTY}" -eq 1 ]]; then
+        requested_mode="strict"
+    fi
+
+    case "${requested_mode}" in
+    auto)
+        if [[ "${TTY_INTERACTIVE}" -eq 1 ]]; then
+            TTY_SESSION_MODE="compat"
+            TTY_SESSION_REASON="auto-interactive"
+        else
+            TTY_SESSION_MODE="strict"
+            TTY_SESSION_REASON="auto-non-interactive"
+        fi
+        ;;
+    compat)
+        TTY_SESSION_MODE="compat"
+        TTY_SESSION_REASON="explicit-compat"
+        ;;
+    strict)
+        TTY_SESSION_MODE="strict"
+        TTY_SESSION_REASON="explicit-strict"
+        ;;
+    *)
+        error "invalid GAETA_TTY_MODE='${GAETA_TTY_MODE_REQUEST}' (expected auto|compat|strict)"
+        return 1
+        ;;
+    esac
+
+    return 0
+}
+
 print_doctor_check() {
     local label="$1"
     local state="$2"
@@ -948,6 +992,10 @@ DOCTOR_HELP
     modes_mode=$(detect_dir_source_mode "${gaeta_modes_dir}" "${opencode_modes_dir}")
     plugins_mode=$(detect_dir_source_mode "${gaeta_plugins_dir}" "${opencode_plugins_dir}")
 
+    if ! determine_tty_session_mode; then
+        return 1
+    fi
+
     local projection_refresh_state="ok"
     local projection_refresh_details="refreshed projection artifacts"
     local previous_quiet="${QUIET}"
@@ -1097,6 +1145,7 @@ DOCTOR_HELP
         printf 'Sandbox Check\n'
     fi
     CURRENT_DOCTOR_SECTION="Sandbox Check"
+    print_doctor_check "tty session policy" "ok" "mode=${TTY_SESSION_MODE} reason=${TTY_SESSION_REASON} interactive=${TTY_INTERACTIVE}"
     if [[ "${GAETA_DOCTOR_SKIP_SANDBOX:-0}" == "1" ]]; then
         print_doctor_check "sandbox execution" "ok" "skipped via GAETA_DOCTOR_SKIP_SANDBOX=1"
     elif command -v bwrap >/dev/null 2>&1; then
@@ -1230,6 +1279,10 @@ write_command_json() {
   "allow_venv": ${ALLOW_VENV},
   "allow_infra": ${ALLOW_INFRA},
   "allow_host_tools": ${ALLOW_HOST_TOOLS},
+  "strict_tty": ${STRICT_TTY},
+  "tty_mode": "${TTY_SESSION_MODE}",
+  "tty_mode_reason": "${TTY_SESSION_REASON}",
+  "tty_interactive": ${TTY_INTERACTIVE},
   "not_paranoid": ${NOT_PARANOID},
   "quiet_landlock": ${QUIET_LANDLOCK},
   "require_landlock": ${REQUIRE_LANDLOCK},
@@ -1665,6 +1718,11 @@ NOT_PARANOID=0
 QUIET_LANDLOCK=0
 REQUIRE_LANDLOCK=0
 HOST_HOME="${HOME}"
+STRICT_TTY=0
+GAETA_TTY_MODE_REQUEST="${GAETA_TTY_MODE:-auto}"
+TTY_SESSION_MODE="strict"
+TTY_SESSION_REASON="unresolved"
+TTY_INTERACTIVE=0
 
 # Landrun/Landlock state
 LANDRUN_AVAILABLE=0
@@ -1793,6 +1851,10 @@ while [[ $# -gt 0 ]]; do
         REQUIRE_LANDLOCK=1
         shift
         ;;
+    --strict-tty)
+        STRICT_TTY=1
+        shift
+        ;;
     --allow-infra)
         ALLOW_INFRA=1
         shift
@@ -1914,6 +1976,10 @@ if [[ "${REQUIRE_LANDLOCK}" -eq 1 ]]; then
 fi
 
 if ! prepare_projection_artifacts; then
+    exit 1
+fi
+
+if ! determine_tty_session_mode; then
     exit 1
 fi
 
@@ -2205,7 +2271,6 @@ fi
 BWRAP_CMD+=(--chdir "${SANDBOX_WORKDIR}")
 BWRAP_CMD+=("${NET_FLAGS[@]}")
 BWRAP_CMD+=(
-    --new-session
     --die-with-parent
     --clearenv
     --setenv PATH "${SANDBOX_PATH}"
@@ -2215,6 +2280,13 @@ BWRAP_CMD+=(
     --setenv MISE_SKIP_ACTIVATE 1
     --setenv UV_LINK_MODE copy
 )
+
+if [[ "${TTY_SESSION_MODE}" == "strict" ]]; then
+    BWRAP_CMD+=(--new-session)
+    info "TTY session mode: strict (${TTY_SESSION_REASON})"
+else
+    info "TTY session mode: compatibility (${TTY_SESSION_REASON})"
+fi
 
 if [[ -n "${PYENV_ROOT_SANDBOX:-}" ]]; then
     BWRAP_CMD+=(--setenv PYENV_ROOT "${PYENV_ROOT_SANDBOX}")
