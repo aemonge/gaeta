@@ -12,20 +12,32 @@
 - [x] Add `gaeta doctor` self-inspection command for config/projection/workflow health.
 - [x] Add `gaeta doctor --json` machine-readable output for validation/TDD workflows.
 - [x] Add `make lint` and `make test` entrypoints (doctor JSON + config inheritance validation).
-- [x] Add `make build` config install target for `~/.config/gaeta` (`opencode.json` + `commands/handoff.md`).
+- [x] Add `make build` config install target for `~/.config/gaeta` (`opencode.json` + command templates).
 - [x] Improve `make lint`/`make test` UX with colored status output and explicit check markers.
 - [x] Document the GAETA acronym expansion in `README.md`.
 - [x] Add interactive TTY compatibility mode by default with strict opt-in (`--strict-tty`).
 - [x] Add `gaeta resume` / `gaeta r` helper to continue from documented phase/context.
-- [x] Set resume launcher defaults to OpenCode `--agent plan` and refine handoff prompt quality.
+- [x] Set resume launcher defaults to OpenCode `--agent orchestrator` and refine handoff prompt quality.
 - [x] Make `/handoff` the single canonical handoff interface and make `gaeta resume` prefer `docs/.gaeta/handoff.md` context.
-- [x] Relax root `opencode.json` permission profile to reduce over-restrictive plan/build failures while keeping destructive command denies.
-- [ ] Add methodology-enforced agent instructions per phase.
+- [x] Relax root `opencode.json` permission profile to reduce over-restrictive agent failures while keeping destructive command denies.
+- [x] Add methodology-enforced agent instructions per phase.
 - [x] Add checklist/status sync behavior for gaeta workflow files.
 - [x] Add `gaeta handoff` command plus project `/handoff` prompt template.
 - [x] Add `gaeta tasks` command flow using `mdt` with graceful fallback.
-- [ ] Add approval-gated self-update proposal flow.
+- [x] Add approval-gated self-update proposal flow.
 - [ ] Add backup snapshot command/script for hard saves.
+- [x] Add OpenCode slash-command pack: `/check`, `/doctor`, `/propose`, `/approve`, `/reject`, `/resume`.
+- [x] Add additional OpenCode agent profiles beyond `plan`/`build` for orchestration and review flows.
+- [x] Reuse `plan` and `build` as core agent roles (`plan`=architecture, `build`=implementation).
+- [x] Remove command-only agent profiles so each agent has non-slash workflow responsibility.
+- [x] Split review workflows into distinct commands: `/review` (reviewer) and `/qa` (qa), with `/check` and `/doctor` compatibility aliases.
+- [x] Add Stage 2 human test checklist for validating gaeta-native agents and slash commands on a sample project.
+- [x] Make `gaeta doctor` quiet by default with colorful status summary and issue-only output.
+- [x] Add `gaeta doctor --verbose` for full section-by-section output.
+- [x] Add doctor check for projected legacy `plan`/`build` profile leakage.
+- [x] Fix `/resume` permission issue by allowing `git status *` for discovery/orchestrator/plan agent profiles.
+- [x] Reduce reviewer permission dead-ends by switching reviewer bash fallback from deny to ask.
+- [x] Expand qa/build permissions for practical validation commands (`gaeta *`, `python -q`, `pytest`, `make lint`, `make test`, `todowrite` for build).
 
 ## Current
 

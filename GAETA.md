@@ -42,6 +42,22 @@ At session end:
 - ensure checklist reflects reality,
 - ensure backlog captures deferred work.
 
+## Operator Slash Commands
+
+- Canonical handoff: `/handoff`.
+- Review and diagnostics: `/review`, `/qa`.
+- Compatibility aliases: `/check` (review), `/doctor` (qa diagnostics).
+- Approval-gated evolution: `/propose`, `/approve`, `/reject`.
+- Resume context preview: `/resume`.
+
+## Agent Roles
+
+- gaeta-native roles: `discovery`, `orchestrator`, `plan`, `build`, `reviewer`, `qa`, `evolution`.
+- `plan` maps to architecture/planning behavior.
+- `build` maps to implementation behavior.
+- Bare `gaeta` defaults to `--agent discovery` when no agent is provided.
+- `gaeta resume` defaults to `--agent orchestrator`.
+
 ## Source of Truth
 
 - Canonical workflow control plane: `docs/.gaeta/*`.

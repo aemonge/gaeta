@@ -23,6 +23,18 @@ mkdir -p "${TEST_PROJECT}/docs/.gaeta"
 cat >"${TEST_HOME}/.config/opencode/opencode.json" <<'JSON'
 {
   "base_only": "from_opencode",
+  "agent": {
+    "plan": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "build": {
+      "permission": {
+        "edit": "allow"
+      }
+    }
+  },
   "nested": {
     "from_base": true,
     "overridden": "base"
@@ -32,6 +44,33 @@ JSON
 
 cat >"${TEST_HOME}/.config/gaeta/opencode.json" <<'JSON'
 {
+  "agent": {
+    "discovery": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "orchestrator": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "reviewer": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "qa": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "evolution": {
+      "permission": {
+        "edit": "deny"
+      }
+    }
+  },
   "gaeta_only": "from_gaeta",
   "nested": {
     "overridden": "gaeta"
@@ -126,6 +165,9 @@ sandbox_rows = {row["label"]: row for row in checks["sandbox_check"]}
 assert "mode=compat" in sandbox_rows["tty session policy"]["details"], sandbox_rows
 assert "skipped" in sandbox_rows["sandbox execution"]["details"], sandbox_rows
 
+projection_rows = {row["label"]: row for row in checks["projection_artifacts"]}
+assert projection_rows["core agent profiles"]["status"] == "ok", projection_rows
+
 projection_file = project / ".gaeta" / "projection" / "opencode.json"
 projection_tui = project / ".gaeta" / "projection" / "tui.json"
 
@@ -136,6 +178,9 @@ assert projected_config["base_only"] == "from_opencode", projected_config
 assert projected_config["gaeta_only"] == "from_gaeta", projected_config
 assert projected_config["nested"]["from_base"] is True, projected_config
 assert projected_config["nested"]["overridden"] == "gaeta", projected_config
+assert "plan" in projected_config["agent"], projected_config
+assert "build" in projected_config["agent"], projected_config
+assert projected_config["agent"]["discovery"]["permission"]["edit"] == "deny", projected_config
 
 assert projected_tui["theme"] == "gaeta", projected_tui
 assert projected_tui["keybinds"]["open"] == "ctrl+o", projected_tui
@@ -144,18 +189,36 @@ assert projected_tui["keybinds"]["quit"] == "ctrl+q", projected_tui
 print("doctor json and config inheritance tests passed")
 PY
 
+DOCTOR_HUMAN_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor "$TEST_PROJECT")"
+[[ "$DOCTOR_HUMAN_OUTPUT" == *"gaeta doctor"* ]]
+[[ "$DOCTOR_HUMAN_OUTPUT" == *"summary:"* ]]
+[[ "$DOCTOR_HUMAN_OUTPUT" != *"Dependencies"* ]]
+
+DOCTOR_VERBOSE_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --verbose "$TEST_PROJECT")"
+[[ "$DOCTOR_VERBOSE_OUTPUT" == *"Dependencies"* ]]
+[[ "$DOCTOR_VERBOSE_OUTPUT" == *"Summary"* ]]
+
 HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
 HOME="$TEST_HOME" "$GAETA_BIN" handoff "$TEST_PROJECT"
+proposal_one="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Build a terminal todo list MVP")"
+HOME="$TEST_HOME" "$GAETA_BIN" proposal approve "$TEST_PROJECT" latest >/dev/null
+proposal_two="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Implement a ping-pong score tracker")"
+HOME="$TEST_HOME" "$GAETA_BIN" proposal reject "$TEST_PROJECT" latest "Need tighter validation" >/dev/null
 
-python3 - "$TEST_PROJECT" <<'PY'
+python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" <<'PY'
 import pathlib
 import sys
 
 project = pathlib.Path(sys.argv[1])
+proposal_one = pathlib.Path(sys.argv[2])
+proposal_two = pathlib.Path(sys.argv[3])
+repo_root = pathlib.Path(sys.argv[4])
 status_text = (project / "docs" / ".gaeta" / "status.md").read_text(encoding="utf-8")
 handoff_text = (project / "docs" / ".gaeta" / "handoff.md").read_text(encoding="utf-8")
 project_text = (project / "PROJECT.md").read_text(encoding="utf-8")
 session_log = (project / ".gaeta" / "session.log").read_text(encoding="utf-8")
+proposal_one_text = proposal_one.read_text(encoding="utf-8")
+proposal_two_text = proposal_two.read_text(encoding="utf-8")
 
 assert "## In progress" in status_text, status_text
 assert "Implement sync behavior." in status_text, status_text
@@ -164,6 +227,58 @@ assert "# Handoff" in handoff_text, handoff_text
 assert "Phase X" in handoff_text, handoff_text
 assert "## Next Step" in project_text, project_text
 assert "handoff: synced status and wrote docs/.gaeta/handoff.md" in session_log, session_log
+
+assert "- Status: approved" in proposal_one_text, proposal_one_text
+assert "approved via gaeta proposal approve" in proposal_one_text, proposal_one_text
+assert "- Status: rejected" in proposal_two_text, proposal_two_text
+assert "Need tighter validation" in proposal_two_text, proposal_two_text
+
+commands_dir = repo_root / ".opencode" / "commands"
+agents_dir = repo_root / ".opencode" / "agents"
+expected = {
+    "handoff.md": "agent: orchestrator",
+    "check.md": "agent: reviewer",
+    "review.md": "agent: reviewer",
+    "doctor.md": "agent: qa",
+    "qa.md": "agent: qa",
+    "propose.md": "agent: evolution",
+    "approve.md": "agent: evolution",
+    "reject.md": "agent: evolution",
+    "resume.md": "agent: orchestrator",
+}
+for name, marker in expected.items():
+    text = (commands_dir / name).read_text(encoding="utf-8")
+    assert marker in text, (name, marker)
+
+config = json.loads((repo_root / "opencode.json").read_text(encoding="utf-8"))
+for agent_name in [
+    "discovery",
+    "orchestrator",
+    "plan",
+    "build",
+    "reviewer",
+    "qa",
+    "evolution",
+]:
+    assert agent_name in config["agent"], agent_name
+for removed in ["architect", "implementer", "handoff-writer"]:
+    assert removed not in config["agent"], removed
+
+assert config["agent"]["orchestrator"]["permission"]["bash"]["git status *"] == "allow", config
+assert config["agent"]["plan"]["permission"]["bash"]["git status *"] == "allow", config
+
+for agent_name in [
+    "discovery",
+    "orchestrator",
+    "plan",
+    "build",
+    "reviewer",
+    "qa",
+    "evolution",
+]:
+    path = agents_dir / f"{agent_name}.md"
+    assert path.exists(), path
+    assert path.read_text(encoding="utf-8").strip(), path
 
 print("tasks sync and handoff tests passed")
 PY

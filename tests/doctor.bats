@@ -15,6 +15,18 @@ setup() {
   cat >"${TEST_HOME}/.config/opencode/opencode.json" <<'JSON'
 {
   "base_only": "from_opencode",
+  "agent": {
+    "plan": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "build": {
+      "permission": {
+        "edit": "allow"
+      }
+    }
+  },
   "nested": {
     "from_base": true,
     "overridden": "base"
@@ -24,6 +36,33 @@ JSON
 
   cat >"${TEST_HOME}/.config/gaeta/opencode.json" <<'JSON'
 {
+  "agent": {
+    "discovery": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "orchestrator": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "reviewer": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "qa": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "evolution": {
+      "permission": {
+        "edit": "deny"
+      }
+    }
+  },
   "gaeta_only": "from_gaeta",
   "nested": {
     "overridden": "gaeta"
@@ -128,6 +167,9 @@ sandbox_rows = {row["label"]: row for row in checks["sandbox_check"]}
 assert "mode=compat" in sandbox_rows["tty session policy"]["details"], sandbox_rows
 assert "skipped" in sandbox_rows["sandbox execution"]["details"], sandbox_rows
 
+projection_rows = {row["label"]: row for row in checks["projection_artifacts"]}
+assert projection_rows["core agent profiles"]["status"] == "ok", projection_rows
+
 projected_config = json.loads((project / ".gaeta" / "projection" / "opencode.json").read_text(encoding="utf-8"))
 projected_tui = json.loads((project / ".gaeta" / "projection" / "tui.json").read_text(encoding="utf-8"))
 
@@ -135,6 +177,9 @@ assert projected_config["base_only"] == "from_opencode", projected_config
 assert projected_config["gaeta_only"] == "from_gaeta", projected_config
 assert projected_config["nested"]["from_base"] is True, projected_config
 assert projected_config["nested"]["overridden"] == "gaeta", projected_config
+assert "plan" in projected_config["agent"], projected_config
+assert "build" in projected_config["agent"], projected_config
+assert projected_config["agent"]["discovery"]["permission"]["edit"] == "deny", projected_config
 
 assert projected_tui["theme"] == "gaeta", projected_tui
 assert projected_tui["keybinds"]["open"] == "ctrl+o", projected_tui
@@ -144,12 +189,25 @@ PY
   [ "$status" -eq 0 ]
 }
 
+@test "doctor human output is quiet by default and expanded with --verbose" {
+  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gaeta doctor"* ]]
+  [[ "$output" == *"summary:"* ]]
+  [[ "$output" != *"Dependencies"* ]]
+
+  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --verbose "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Dependencies"* ]]
+  [[ "$output" == *"Summary"* ]]
+}
+
 @test "resume and r show launch prompt context" {
   run env HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$TEST_PROJECT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"gaeta resume"* ]]
   [[ "$output" == *"launch:"* ]]
-  [[ "$output" == *"--agent plan"* ]]
+  [[ "$output" == *"--agent orchestrator"* ]]
   [[ "$output" == *"--prompt"* ]]
   [[ "$output" == *"continue from resume helper output"* ]]
 
@@ -250,13 +308,122 @@ PY
   [ "$status" -eq 0 ]
 }
 
-@test "handoff slash command runs with build agent" {
+@test "handoff slash command runs with orchestrator agent" {
   run python3 - "$REPO_ROOT/.opencode/commands/handoff.md" <<'PY'
 import pathlib
 import sys
 
 text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
-assert "agent: build" in text, text
+assert "agent: orchestrator" in text, text
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "proposal workflow create approve reject works" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Build a terminal todo list MVP"
+  [ "$status" -eq 0 ]
+
+  proposal_path="$output"
+  [[ "$proposal_path" == *"docs/.gaeta/proposals/"* ]]
+
+  run python3 - "$proposal_path" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+assert "- Status: pending" in text, text
+assert "## Summary" in text, text
+assert "Pending capture via /propose." in text, text
+PY
+  [ "$status" -eq 0 ]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" proposal approve "$TEST_PROJECT" latest
+  [ "$status" -eq 0 ]
+
+  run python3 - "$output" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+assert "- Status: approved" in text, text
+assert "approved via gaeta proposal approve" in text, text
+PY
+  [ "$status" -eq 0 ]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Implement a ping-pong score tracker"
+  [ "$status" -eq 0 ]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" proposal reject "$TEST_PROJECT" latest "Need tighter validation"
+  [ "$status" -eq 0 ]
+
+  run python3 - "$output" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+assert "- Status: rejected" in text, text
+assert "Need tighter validation" in text, text
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "slash command pack files have expected agent bindings" {
+  run python3 - "$REPO_ROOT" <<'PY'
+import pathlib
+import sys
+import json
+
+repo = pathlib.Path(sys.argv[1])
+commands = repo / ".opencode" / "commands"
+agents_dir = repo / ".opencode" / "agents"
+expected = {
+    "handoff.md": "agent: orchestrator",
+    "check.md": "agent: reviewer",
+    "review.md": "agent: reviewer",
+    "doctor.md": "agent: qa",
+    "qa.md": "agent: qa",
+    "propose.md": "agent: evolution",
+    "approve.md": "agent: evolution",
+    "reject.md": "agent: evolution",
+    "resume.md": "agent: orchestrator",
+}
+
+for name, marker in expected.items():
+    text = (commands / name).read_text(encoding="utf-8")
+    assert marker in text, (name, marker)
+
+config = json.loads((repo / "opencode.json").read_text(encoding="utf-8"))
+for agent_name in [
+    "discovery",
+    "orchestrator",
+    "plan",
+    "build",
+    "reviewer",
+    "qa",
+    "evolution",
+]:
+    assert agent_name in config["agent"], agent_name
+for removed in ["architect", "implementer", "handoff-writer"]:
+    assert removed not in config["agent"], removed
+
+assert config["agent"]["orchestrator"]["permission"]["bash"]["git status *"] == "allow", config
+assert config["agent"]["plan"]["permission"]["bash"]["git status *"] == "allow", config
+
+for agent_name in [
+    "discovery",
+    "orchestrator",
+    "plan",
+    "build",
+    "reviewer",
+    "qa",
+    "evolution",
+]:
+    path = agents_dir / f"{agent_name}.md"
+    assert path.exists(), path
+    assert path.read_text(encoding="utf-8").strip(), path
 PY
   [ "$status" -eq 0 ]
 }

@@ -1,8 +1,14 @@
 ---
 description: Capture complete handoff for next gaeta resume
-agent: build
+agent: orchestrator
 ---
-Run `./gaeta handoff`.
+Resolve gaeta launcher in this order:
+1. `./gaeta` when present in current project root.
+2. `gaeta` from PATH.
+
+If neither launcher exists, stop and report: `gaeta not found` (recommended fix: run `make build` in gaeta repo and ensure `gaeta` is in PATH).
+
+Run `<gaeta-launcher> handoff`.
 
 Then update `docs/.gaeta/handoff.md` by replacing the placeholder bullets in these sections with concise, session-accurate content:
 - `## Project update`

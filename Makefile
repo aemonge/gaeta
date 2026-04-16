@@ -14,15 +14,17 @@ NC := \033[0m
 build:
 	@printf "$(BLUE)==> Installing gaeta config bundle$(NC)\n"
 	@mkdir -p "$(GAETA_CONFIG_HOME)/commands"
+	@mkdir -p "$(GAETA_CONFIG_HOME)/agents"
 	@install -m 0644 opencode.json "$(GAETA_CONFIG_HOME)/opencode.json"
-	@install -m 0644 .opencode/commands/handoff.md "$(GAETA_CONFIG_HOME)/commands/handoff.md"
+	@install -m 0644 .opencode/commands/*.md "$(GAETA_CONFIG_HOME)/commands/"
+	@install -m 0644 .opencode/agents/*.md "$(GAETA_CONFIG_HOME)/agents/"
 	@if [ -f tui.json ]; then \
 		install -m 0644 tui.json "$(GAETA_CONFIG_HOME)/tui.json"; \
 		printf "$(GREEN)[OK] installed tui.json$(NC)\n"; \
 	else \
 		printf "$(YELLOW)[SKIP] tui.json not found$(NC)\n"; \
 	fi
-	@printf "$(GREEN)[OK] installed opencode.json + commands/handoff.md to $(GAETA_CONFIG_HOME)$(NC)\n"
+	@printf "$(GREEN)[OK] installed opencode.json + command/agent templates to $(GAETA_CONFIG_HOME)$(NC)\n"
 
 lint:
 	@printf "$(BLUE)==> Running lint checks$(NC)\n"

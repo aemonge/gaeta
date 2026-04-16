@@ -159,47 +159,68 @@
     "doom_loop": "deny"
   },
   "agent": {
-    "build": {
+    "discovery": {
       "permission": {
+        "edit": "deny",
         "bash": {
-          "python *.py": "ask",
-          "python ./*.py": "ask",
-          "python */*.py": "ask",
-          "python -m pytest*": "ask",
-          "python -m unittest*": "ask",
-          "python -m *": "ask",
-          "node *.js": "ask",
-          "node ./*.js": "ask",
-          "npm run *": "ask",
-          "npm test": "ask",
-          "pytest": "ask",
-          "pytest *": "ask",
-          "make": "ask",
-          "make *": "ask",
-          "npm *": "allow",
-          "pip list": "allow",
-          "pip show *": "allow",
-          "pip *": "allow",
-          "cargo build": "allow",
-          "cargo test": "allow",
-          "cargo check": "allow",
-          "cargo run": "allow",
-          "cargo clippy": "allow",
-          "cargo fmt": "allow",
-          "cargo *": "allow",
-          "rustc": "allow",
-          "rustc *": "allow",
-          "git checkout *": "ask",
-          "git stash": "ask",
-          "git stash *": "ask",
-          "git *": "ask",
-          "*": "ask"
+          "*": "deny",
+          "ls": "allow",
+          "ls *": "allow",
+          "cat": "allow",
+          "cat *": "allow",
+          "grep": "allow",
+          "grep *": "allow",
+          "find": "allow",
+          "find *": "allow",
+          "tree": "allow",
+          "tree *": "allow",
+          "git status": "allow",
+          "git status *": "allow",
+          "git diff": "allow",
+          "git diff *": "allow",
+          "git log": "allow",
+          "git log *": "allow"
         },
-        "task": "ask",
-        "skill": "allow",
-        "todowrite": "ask",
-        "webfetch": "ask",
-        "websearch": "ask"
+        "task": "deny",
+        "skill": "deny",
+        "todowrite": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
+      }
+    },
+    "orchestrator": {
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "ls": "allow",
+          "ls *": "allow",
+          "cat": "allow",
+          "cat *": "allow",
+          "grep": "allow",
+          "grep *": "allow",
+          "find": "allow",
+          "find *": "allow",
+          "tree": "allow",
+          "tree *": "allow",
+          "git status": "allow",
+          "git status *": "allow",
+          "git log": "allow",
+          "git log *": "allow",
+          "git diff": "allow",
+          "git diff *": "allow",
+          "git show": "allow",
+          "git show *": "allow",
+          "./gaeta doctor": "allow",
+          "./gaeta doctor *": "allow",
+          "./gaeta resume --show": "allow",
+          "./gaeta resume --show *": "allow"
+        },
+        "task": "deny",
+        "skill": "deny",
+        "todowrite": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
       }
     },
     "plan": {
@@ -218,6 +239,7 @@
           "tree": "allow",
           "tree *": "allow",
           "git status": "allow",
+          "git status *": "allow",
           "git log": "allow",
           "git log *": "allow",
           "git diff": "allow",
@@ -227,6 +249,95 @@
         },
         "task": "deny",
         "skill": "deny",
+        "todowrite": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
+      }
+    },
+    "build": {
+      "permission": {
+        "bash": {
+          "python -q": "allow",
+          "python -q *": "allow",
+          "python -m pytest": "allow",
+          "python -m pytest *": "allow",
+          "pytest": "allow",
+          "pytest *": "allow",
+          "*": "ask"
+        },
+        "task": "ask",
+        "skill": "allow",
+        "todowrite": "allow",
+        "webfetch": "ask",
+        "websearch": "ask"
+      }
+    },
+    "reviewer": {
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "ask",
+          "ls": "allow",
+          "ls *": "allow",
+          "cat": "allow",
+          "cat *": "allow",
+          "grep": "allow",
+          "grep *": "allow",
+          "find": "allow",
+          "find *": "allow",
+          "tree": "allow",
+          "tree *": "allow",
+          "git status": "allow",
+          "git status *": "allow",
+          "git diff": "allow",
+          "git diff *": "allow",
+          "git show": "allow",
+          "git show *": "allow",
+          "sem": "allow",
+          "sem *": "allow",
+          "./gaeta doctor": "allow",
+          "./gaeta doctor *": "allow",
+          "./gaeta proposal list": "allow",
+          "./gaeta proposal list *": "allow"
+        },
+        "task": "deny",
+        "skill": "deny",
+        "todowrite": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
+      }
+    },
+    "qa": {
+      "permission": {
+        "bash": {
+          "./gaeta": "allow",
+          "./gaeta *": "allow",
+          "gaeta": "allow",
+          "gaeta *": "allow",
+          "python -q": "allow",
+          "python -q *": "allow",
+          "python -m pytest": "allow",
+          "python -m pytest *": "allow",
+          "pytest": "allow",
+          "pytest *": "allow",
+          "make lint": "allow",
+          "make test": "allow",
+          "*": "ask"
+        },
+        "task": "deny",
+        "skill": "allow",
+        "todowrite": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
+      }
+    },
+    "evolution": {
+      "permission": {
+        "bash": {
+          "*": "allow"
+        },
+        "task": "deny",
+        "skill": "allow",
         "todowrite": "deny",
         "webfetch": "allow",
         "websearch": "allow"

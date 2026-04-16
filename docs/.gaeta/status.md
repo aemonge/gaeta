@@ -21,11 +21,11 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - `gaeta doctor` now performs self-inspection for dependencies, config sources, projection artifacts, workflow files, and an in-sandbox launch check.
 - `gaeta doctor --json` now emits machine-readable output for repeatable validation and TDD automation.
 - `make lint` and `make test` now exist; test flow prefers `bats` and falls back to shell script validation for doctor JSON and config inheritance, with shellharden checks on hardened test scripts.
-- `make build` now installs a lean config bundle to `~/.config/gaeta` (`opencode.json` and `commands/handoff.md`, plus optional `tui.json` when present).
+- `make build` now installs a lean config bundle to `~/.config/gaeta` (`opencode.json`, all `.opencode/commands/*.md` templates, and all `.opencode/agents/*.md` role prompts, plus optional `tui.json` when present).
 - `README.md` now expands the gaeta acronym as "Guided Assistant Engineered Taskflow Agent" for clearer project naming context.
 - `make lint`/`make test` now provide colored, explicit status markers for check outcomes.
 - Interactive sessions now default to TTY compatibility mode (better resize/redraw behavior), with strict session isolation opt-in via `--strict-tty`.
-- `gaeta resume` (`gaeta r`) now launches a resumed gaeta session using OpenCode `--agent plan` plus a read-only handoff `--prompt`, with `--show` for dry-run visibility.
+- `gaeta resume` (`gaeta r`) now launches a resumed gaeta session using OpenCode `--agent orchestrator` plus a read-only handoff `--prompt`, with `--show` for dry-run visibility.
 - Operator resume prompt is recorded in `PROJECT.md` under `## Resume Prompt` for clean handoff into new gaeta sessions.
 - Root `opencode.json` permissions now use an explicit allow baseline for `read`, `edit`, and `external_directory` to prevent permission deadlocks in build workflows; destructive bash denies remain in place.
 - Repo docs were previously split/inconsistent; canonical workflow location is now `docs/.gaeta/`.
@@ -34,23 +34,35 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - `gaeta handoff` now syncs `docs/.gaeta/status.md`, writes `docs/.gaeta/handoff.md`, updates `PROJECT.md` `## Next Step`, and appends a runtime handoff log entry.
 - Per-project OpenCode `/handoff` is now available via `.opencode/commands/handoff.md`.
 - `/handoff` is now the single canonical handoff interface (no aliases), with richer narrative capture sections in `docs/.gaeta/handoff.md`.
-- `/handoff` slash-command now runs with `agent: build` to avoid read-only Plan-mode execution blocks.
+- `/handoff` slash-command now runs with `agent: orchestrator` (core agent roster only).
 - `gaeta resume` now prefers `docs/.gaeta/handoff.md` context (project update, conversation summary, attempts/outcomes, decisions, frozen items) before falling back to `PROJECT.md`/`status.md`.
+- Added `gaeta proposal` subcommands (`create`, `list`, `approve`, `reject`) to support explicit approval-gated proposal artifacts under `docs/.gaeta/proposals/`.
+- Added OpenCode slash-command pack entries: `/review`, `/qa`, `/propose`, `/approve`, `/reject`, `/resume` plus compatibility aliases `/check` and `/doctor`.
+- Added core gaeta OpenCode agent profiles in `opencode.json`: `discovery`, `orchestrator`, `plan`, `build`, `reviewer`, `qa`, and `evolution`.
+- Removed command-only agent profiles so each agent has a workflow role beyond a single slash command.
+- Bare `gaeta` launches now default to `--agent discovery` when no `--agent` is provided.
+- Added per-project `.opencode/agents/*.md` role prompts for all gaeta-native agents.
+- Config merge now supports tombstones (`null`) for structured files, allowing gaeta overlays to remove inherited keys (used to prevent legacy `plan`/`build` agent leakage from base OpenCode config).
+- Added `docs/.gaeta/human_test_agents.md` with a sample ping-pong project checklist to manually validate all gaeta-native agents and slash commands.
+- Validation now covers proposal lifecycle and slash-command/agent bindings in both `tests/doctor.bats` and `scripts/test-doctor.sh`.
+- `gaeta doctor` human output is now quiet by default (summary + warn/fail lines) and uses colored status labels.
+- `gaeta doctor --verbose` now emits the full section-by-section check table.
+- Doctor now includes a projected-config check that validates core agent profile presence and warns on deprecated command-only profiles.
+- Fixed resume/orchestrator permission gap by allowing `git status *` flags for `discovery`, `orchestrator`, and `plan` profiles.
+- Reduced reviewer permission denials by setting reviewer bash fallback to `ask` (instead of hard deny).
+- Expanded qa/build practical command permissions (`gaeta *`, `python -q`, `pytest`, `make lint`, `make test`; build `todowrite` now allowed).
 
 ## In progress
 
-- Add methodology-enforced agent instructions per phase.
-- Add approval-gated self-update proposal flow.
 - Add backup snapshot command/script for hard saves.
 
 ## Blockers
 
-- Need to define the first approval-gated Darwin/Godel proposal format.
 - Full sandbox runtime validation is limited in this environment due namespace limits (`bwrap` ENOSPC), so wrapper behavior validation is currently partial.
 
 ## Next step
 
-Add methodology-enforced agent instructions per phase.
+Add backup snapshot command/script for hard saves.
 
 ## Decisions
 
@@ -64,8 +76,7 @@ Add methodology-enforced agent instructions per phase.
 - Doctor output modes are now dual: human-readable default and JSON via `--json`.
 - Doctor JSON and human outputs now share the same check collection source and differ only in rendering.
 - TTY session policy is now explicit and observable (`compat`/`strict`) in doctor output and `.gaeta/command.json`.
-- Session handoff prompt is now executable via `gaeta resume` with default plan agent (and inspectable via `gaeta resume --show`) to support clean migration from legacy scoder usage.
-- Plan agent remains read-only (`edit: deny`) while bash policy now favors explicit allow/deny (no interactive ask dependency in sandbox flow).
+- Session handoff prompt is executable via `gaeta resume` with default `orchestrator` agent (inspectable via `gaeta resume --show`).
 - `docs/.gaeta/` is the canonical repository workflow control plane.
 - Markdown checklists are the workflow task system.
 - Self-updating behavior is approval-gated only.
@@ -75,4 +86,13 @@ Add methodology-enforced agent instructions per phase.
 - Handoff updates are implemented as an explicit wrapper command (`gaeta handoff`) plus a per-project OpenCode slash-command template (`.opencode/commands/handoff.md`).
 - Updated root permission baseline to avoid build-agent deadlocks caused by overly narrow `external_directory`/`edit` patterns.
 - Keep `/handoff` as the only handoff slash command (no alias commands).
-- `/handoff` should execute under Build agent policy because it performs file updates (`./gaeta handoff` + handoff doc edits).
+- `/handoff` executes under `orchestrator` policy to avoid command-only agent sprawl.
+- Approval-gated evolution flow is file-first and explicit: proposals are created and state-transitioned via `gaeta proposal` (`pending` -> `approved` or `rejected`) under `docs/.gaeta/proposals/`.
+- New operator slash commands are split by intent: review (`/review`, `/qa`, with `/check` and `/doctor` aliases), governance (`/propose`, `/approve`, `/reject`), and context (`/resume`).
+- Agent roster is core-only: `discovery`, `orchestrator`, `plan`, `build`, `reviewer`, `qa`, `evolution`.
+- Bare `gaeta` sessions default to `discovery` unless an explicit `--agent` is passed.
+- `gaeta resume` defaults to `orchestrator` for role-based continuation.
+- `plan` and `build` are now intentional core profiles: `plan` for architecture/planning and `build` for implementation.
+- `discovery`, `orchestrator`, and `plan` explicitly allow `git status *` to avoid flag-based permission denials in resume-driven sessions.
+- `reviewer` now prioritizes progress over hard blocks by using bash fallback `ask` for unknown review commands.
+- `qa` now explicitly allows `gaeta` command execution to support diagnostics in non-default command paths.
