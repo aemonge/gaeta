@@ -129,6 +129,18 @@ cat >"${TEST_PROJECT}/docs/.gaeta/backlog.md" <<'MD'
 # backlog
 MD
 
+cat >"${TEST_PROJECT}/PROJECT.md" <<'MD'
+# PROJECT
+
+## Resume Prompt
+
+`continue from resume helper output`
+MD
+
+cat >"${TEST_PROJECT}/GAETA.md" <<'MD'
+# GAETA
+MD
+
 DOCTOR_JSON_PATH="${TEST_ROOT}/doctor.json"
 
 HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat "$GAETA_BIN" doctor --json "$TEST_PROJECT" >"$DOCTOR_JSON_PATH"
@@ -197,6 +209,39 @@ DOCTOR_HUMAN_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKI
 DOCTOR_VERBOSE_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --verbose "$TEST_PROJECT")"
 [[ "$DOCTOR_VERBOSE_OUTPUT" == *"Dependencies"* ]]
 [[ "$DOCTOR_VERBOSE_OUTPUT" == *"Summary"* ]]
+
+UNINIT_PROJECT="${TEST_ROOT}/uninitialized-project"
+mkdir -p "$UNINIT_PROJECT"
+
+set +e
+UNINIT_RESUME_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$UNINIT_PROJECT" 2>&1)"
+UNINIT_RESUME_STATUS=$?
+set -e
+[[ "$UNINIT_RESUME_STATUS" -ne 0 ]]
+[[ "$UNINIT_RESUME_OUTPUT" == *"requires an initialized gaeta project"* ]]
+[[ "$UNINIT_RESUME_OUTPUT" == *"gaeta init"* ]]
+
+HOME="$TEST_HOME" "$GAETA_BIN" init "$UNINIT_PROJECT" >/dev/null
+
+python3 - "$UNINIT_PROJECT" <<'PY'
+import pathlib
+import sys
+
+project = pathlib.Path(sys.argv[1])
+required = [
+    "PROJECT.md",
+    "GAETA.md",
+    "docs/.gaeta/phases.md",
+    "docs/.gaeta/status.md",
+    "docs/.gaeta/checklist.md",
+    "docs/.gaeta/backlog.md",
+]
+for rel in required:
+    path = project / rel
+    assert path.exists(), path
+PY
+
+HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$UNINIT_PROJECT" >/dev/null
 
 HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
 HOME="$TEST_HOME" "$GAETA_BIN" handoff "$TEST_PROJECT"

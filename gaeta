@@ -26,6 +26,7 @@ gaeta 0.9.0
 Safe OpenCode wrapper using bubblewrap with optional Landlock defense-in-depth.
 
 Usage:
+  gaeta init [--force] [PROJECT_DIR]
   gaeta doctor [PROJECT_DIR]
   gaeta resume [--show] [PROJECT_DIR]
   gaeta r [--show] [PROJECT_DIR]
@@ -35,6 +36,7 @@ Usage:
   gaeta [options] [PROJECT_DIR] [-- [OPENCODE_ARGS...]]
 
 Options:
+  init                  Initialize gaeta workflow files in a project
   doctor                 Run gaeta self-inspection checks
   resume, r              Show phase/next-step resume context
   handoff                Sync workflow docs and write handoff snapshot
@@ -71,6 +73,7 @@ PARANOID_EOF
   cat <<'USAGE_END'
 
 Arguments:
+  INIT_PROJECT_DIR       Optional target project for init mode
   DOCTOR_PROJECT_DIR     Optional target project for doctor mode
   TASK_ARGS              Passed to mdt when available
   PROJECT_DIR            Project directory exposed at same absolute path (default: $PWD)
@@ -124,6 +127,9 @@ Paranoid Mode (Defense-in-Depth):
     - Linux kernel 6.7+ for network syscall restrictions
 
 Examples:
+  gaeta init              # scaffold PROJECT.md, GAETA.md, docs/.gaeta/* in $PWD
+  gaeta init ../repo      # initialize another project directory
+  gaeta init --force .    # overwrite existing workflow files
   gaeta doctor             # inspect gaeta config and projection health
   gaeta doctor --json      # inspect gaeta health as JSON
   gaeta doctor ../repo     # inspect another project
@@ -665,6 +671,310 @@ apply_default_agent_if_needed() {
   info "No --agent provided; defaulting to ${default_agent}"
 }
 
+readonly -a GAETA_INIT_REQUIRED_FILES=(
+  "PROJECT.md"
+  "GAETA.md"
+  "docs/.gaeta/phases.md"
+  "docs/.gaeta/status.md"
+  "docs/.gaeta/checklist.md"
+  "docs/.gaeta/backlog.md"
+)
+
+collect_missing_init_files() {
+  local project_dir="$1"
+  local rel
+  local -a missing=()
+
+  for rel in "${GAETA_INIT_REQUIRED_FILES[@]}"; do
+    if [[ ! -f "${project_dir}/${rel}" ]]; then
+      missing+=("${rel}")
+    fi
+  done
+
+  printf '%s\n' "${missing[@]}"
+}
+
+is_project_initialized() {
+  local project_dir="$1"
+  local rel
+  for rel in "${GAETA_INIT_REQUIRED_FILES[@]}"; do
+    if [[ ! -f "${project_dir}/${rel}" ]]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+require_project_initialized() {
+  local project_dir="$1"
+  local command_name="$2"
+  local missing
+
+  if is_project_initialized "${project_dir}"; then
+    return 0
+  fi
+
+  error "${command_name} requires an initialized gaeta project: ${project_dir}"
+  error "run: gaeta init \"${project_dir}\""
+  missing=$(collect_missing_init_files "${project_dir}")
+  if [[ -n "${missing}" ]]; then
+    error "missing files:"
+    while IFS= read -r line; do
+      [[ -n "${line}" ]] && error "  - ${line}"
+    done <<<"${missing}"
+  fi
+  return 1
+}
+
+run_init_command() {
+  local target_project="${PWD}"
+  local force=0
+  local -a init_positionals=()
+
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'INIT_HELP'
+Usage:
+  gaeta init [--force] [PROJECT_DIR]
+
+Scaffolds required gaeta workflow files:
+  - PROJECT.md
+  - GAETA.md
+  - docs/.gaeta/phases.md
+  - docs/.gaeta/status.md
+  - docs/.gaeta/checklist.md
+  - docs/.gaeta/backlog.md
+
+Options:
+  --force    Overwrite existing files
+INIT_HELP
+    return 0
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --force)
+        force=1
+        ;;
+      *)
+        init_positionals+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  if [[ ${#init_positionals[@]} -gt 1 ]]; then
+    error "init accepts at most one optional PROJECT_DIR"
+    return 1
+  fi
+
+  if [[ ${#init_positionals[@]} -eq 1 ]]; then
+    target_project="${init_positionals[0]}"
+  fi
+
+  if [[ ! -d "${target_project}" ]]; then
+    error "init project directory does not exist: ${target_project}"
+    return 1
+  fi
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    error "python3 is required for init command"
+    return 1
+  fi
+
+  target_project="$(realpath "${target_project}")"
+
+  if ! python3 - "${target_project}" "${force}" <<'PY'; then
+import pathlib
+import sys
+
+project_dir = pathlib.Path(sys.argv[1])
+force = sys.argv[2] == "1"
+
+files = {
+    "PROJECT.md": """# PROJECT
+
+## Snapshot
+
+- Name: {project_name}
+- Direction: define project direction.
+- Current phase: Phase 0.
+- Current sprint: initialize gaeta workflow.
+
+## Next Step
+
+Define initial scope and first implementation slice.
+
+## Resume Prompt
+
+`Read AGENTS.md and docs/.gaeta/{{phases,status,checklist,backlog}} plus PROJECT.md and GAETA.md. Provide a concise read-only handoff: current phase, next step, top pending sprint items, and blockers. Do not modify files yet; propose the exact first implementation slice and validation commands.`
+
+## Blockers
+
+- none
+
+## Canonical Workflow Files
+
+- `docs/.gaeta/phases.md`
+- `docs/.gaeta/status.md`
+- `docs/.gaeta/checklist.md`
+- `docs/.gaeta/backlog.md`
+""",
+    "GAETA.md": """# GAETA
+
+gaeta means Guided Assistant Engineered Taskflow Agent.
+
+## Operator Rules
+
+Before meaningful work:
+- read `docs/.gaeta/phases.md`,
+- read `docs/.gaeta/status.md`,
+- read `docs/.gaeta/checklist.md`,
+- read `docs/.gaeta/backlog.md`.
+
+During work:
+- align with active phase,
+- update checklist when task state changes,
+- update status after meaningful changes,
+- record blockers explicitly in status.
+
+At session end:
+- leave next step explicit in status,
+- ensure checklist reflects reality,
+- ensure backlog captures deferred work.
+""",
+    "docs/.gaeta/phases.md": """# Phases
+
+## Active delivery model
+
+### Phase 0 - Scope
+
+Purpose:
+- freeze target behavior and non-goals.
+
+Exit:
+- architecture and ADRs written.
+
+### Phase 1 - Config
+
+Purpose:
+- define `~/.config/gaeta` layout and schema.
+
+Exit:
+- `opencode.json` schema and sample config exist.
+
+### Phase 2 - Projection
+
+Purpose:
+- map gaeta config/assets into OpenCode-compatible paths.
+
+Exit:
+- generated compatibility view works.
+
+### Phase 3 - Wrapper
+
+Purpose:
+- integrate projection with sandbox launch.
+
+Exit:
+- `gaeta` launches OpenCode using projected state.
+
+### Phase 4 - Workflow
+
+Purpose:
+- bootstrap repo docs and behavioral rules.
+
+Exit:
+- repo template and GAETA rules exist.
+
+### Phase 5 - Validation
+
+Purpose:
+- verify sandbox, projection, and workflow behavior.
+
+Exit:
+- validation suite covers critical scenarios.
+""",
+    "docs/.gaeta/status.md": """# Status
+
+## Current phase
+
+Phase 0
+
+## Objective
+
+Define project scope, workflow constraints, and initial implementation direction.
+
+## Current state
+
+- gaeta workflow initialized.
+
+## In progress
+
+- Define initial scope.
+
+## Blockers
+
+- none
+
+## Next step
+
+Define first implementation slice and validation commands.
+
+## Decisions
+
+- `docs/.gaeta/*` is the canonical workflow control plane.
+""",
+    "docs/.gaeta/checklist.md": """# Checklist
+
+## Current Sprint
+
+- [ ] Define initial scope.
+- [ ] Implement first slice.
+
+## Current
+
+- [ ] Confirm workflow and quality gates.
+
+## Done
+
+- [x] Initialize gaeta workflow files.
+""",
+    "docs/.gaeta/backlog.md": """# Backlog
+
+- [ ] Add deferred work items discovered during implementation.
+""",
+}
+
+actions = {}
+project_name = project_dir.name
+
+for rel, template in files.items():
+    path = project_dir / rel
+    rendered = template.format(project_name=project_name)
+    if path.exists() and not force:
+        actions[rel] = "kept"
+        continue
+    existed_before = path.exists()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(rendered if rendered.endswith("\n") else rendered + "\n", encoding="utf-8")
+    if existed_before:
+        actions[rel] = "overwrote"
+    else:
+        actions[rel] = "created"
+
+print(f"project: {project_dir}")
+print("initialized workflow files:")
+for rel in files:
+    action = actions.get(rel, "created")
+    print(f"- {action}: {rel}")
+PY
+    error "failed to initialize workflow files"
+    return 1
+  fi
+
+  return 0
+}
+
 sync_status_from_checklist() {
   local checklist_path="$1"
   local status_path="$2"
@@ -853,6 +1163,10 @@ run_tasks_command() {
   local checklist_path="${gaeta_dir}/checklist.md"
   local status_path="${gaeta_dir}/status.md"
 
+  if ! require_project_initialized "${project_dir}" "tasks"; then
+    return 1
+  fi
+
   if [[ "${task_args[0]:-}" == "sync" ]]; then
     sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-sync"
     return $?
@@ -928,6 +1242,10 @@ HANDOFF_HELP
 
   target_project="$(realpath "${target_project}")"
 
+  if ! require_project_initialized "${target_project}" "handoff"; then
+    return 1
+  fi
+
   local gaeta_dir="${target_project}/docs/.gaeta"
   local checklist_path="${gaeta_dir}/checklist.md"
   local status_path="${gaeta_dir}/status.md"
@@ -935,11 +1253,6 @@ HANDOFF_HELP
   local handoff_path="${gaeta_dir}/handoff.md"
   local project_path="${target_project}/PROJECT.md"
   local runtime_log="${target_project}/.gaeta/session.log"
-
-  if [[ ! -d "${gaeta_dir}" ]]; then
-    error "handoff requires docs/.gaeta in target project: ${target_project}"
-    return 1
-  fi
 
   if ! sync_status_from_checklist "${checklist_path}" "${status_path}" "handoff"; then
     return 1
@@ -1159,6 +1472,9 @@ PROPOSAL_HELP
   fi
 
   target_project="$(realpath "${target_project}")"
+  if ! require_project_initialized "${target_project}" "proposal"; then
+    return 1
+  fi
   local proposals_dir="${target_project}/docs/.gaeta/proposals"
 
   if [[ "${action}" == "create" ]]; then
@@ -1859,6 +2175,8 @@ PY
   local workflow_checklist="${target_project}/docs/.gaeta/checklist.md"
   local workflow_backlog="${target_project}/docs/.gaeta/backlog.md"
   local workflow_phases="${target_project}/docs/.gaeta/phases.md"
+  local workflow_project_md="${target_project}/PROJECT.md"
+  local workflow_gaeta_md="${target_project}/GAETA.md"
 
   if [[ "${DOCTOR_JSON}" -ne 1 && "${DOCTOR_VERBOSE}" -eq 1 ]]; then
     printf '\n'
@@ -1890,6 +2208,27 @@ PY
     print_doctor_check "backlog.md" "ok" "${workflow_backlog}"
   else
     print_doctor_check "backlog.md" "warn" "missing"
+    ((warn_count += 1))
+  fi
+
+  if [[ -f "${workflow_project_md}" ]]; then
+    print_doctor_check "PROJECT.md" "ok" "${workflow_project_md}"
+  else
+    print_doctor_check "PROJECT.md" "warn" "missing"
+    ((warn_count += 1))
+  fi
+
+  if [[ -f "${workflow_gaeta_md}" ]]; then
+    print_doctor_check "GAETA.md" "ok" "${workflow_gaeta_md}"
+  else
+    print_doctor_check "GAETA.md" "warn" "missing"
+    ((warn_count += 1))
+  fi
+
+  if is_project_initialized "${target_project}"; then
+    print_doctor_check "init state" "ok" "initialized"
+  else
+    print_doctor_check "init state" "warn" "not initialized (run: gaeta init \"${target_project}\")"
     ((warn_count += 1))
   fi
 
@@ -1971,6 +2310,9 @@ RESUME_HELP
   fi
 
   target_project="$(realpath "${target_project}")"
+  if ! require_project_initialized "${target_project}" "resume"; then
+    return 1
+  fi
   status_file="${target_project}/docs/.gaeta/status.md"
   checklist_file="${target_project}/docs/.gaeta/checklist.md"
   handoff_file="${target_project}/docs/.gaeta/handoff.md"
@@ -2642,6 +2984,15 @@ PROJECT_DIR=""
 OPENCODE_ARGS=()
 
 # Command dispatch: gaeta doctor ...
+if [[ "${1:-}" == "init" ]]; then
+  shift
+  if ! run_init_command "$@"; then
+    exit 1
+  fi
+  exit 0
+fi
+
+# Command dispatch: gaeta doctor ...
 if [[ "${1:-}" == "doctor" ]]; then
   shift
   if ! run_doctor_command "$@"; then
@@ -2870,6 +3221,10 @@ fi
 
 PROJECT_DIR="$(realpath "${PROJECT_DIR}")"
 SANDBOX_WORKDIR="${PROJECT_DIR}"
+
+if ! require_project_initialized "${PROJECT_DIR}" "launch"; then
+  exit 1
+fi
 
 init_metadata_dir
 update_phase "validated"

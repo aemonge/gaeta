@@ -38,6 +38,8 @@
 - [x] Fix `/resume` permission issue by allowing `git status *` for discovery/orchestrator/plan agent profiles.
 - [x] Reduce reviewer permission dead-ends by switching reviewer bash fallback from deny to ask.
 - [x] Expand qa/build permissions for practical validation commands (`gaeta *`, `python -q`, `pytest`, `make lint`, `make test`, `todowrite` for build).
+- [x] Add `gaeta init` command to scaffold required workflow files in new projects.
+- [x] Add initialization guard so `launch`, `resume`, `handoff`, `tasks`, and `proposal` fail fast when project workflow files are missing.
 
 ## Current
 

@@ -13,6 +13,8 @@ Run these checks in order:
 1. `<gaeta-launcher> doctor --json .`
 2. If available, run project validation commands in this order: `make lint`, then `make test`.
 
+If gaeta reports the project is uninitialized, run `<gaeta-launcher> init .` before diagnostics.
+
 Then reply with a concise QA report:
 - overall pass/fail,
 - failing checks and root cause,

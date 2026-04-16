@@ -124,6 +124,10 @@ MD
 
 `continue from resume helper output`
 MD
+
+  cat >"${TEST_PROJECT}/GAETA.md" <<'MD'
+# GAETA
+MD
 }
 
 teardown() {
@@ -200,6 +204,43 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"Dependencies"* ]]
   [[ "$output" == *"Summary"* ]]
+}
+
+@test "init scaffolds missing workflow files and unblocks resume" {
+  local uninit_project="${TEST_ROOT}/uninitialized-project"
+  mkdir -p "$uninit_project"
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$uninit_project"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"requires an initialized gaeta project"* ]]
+  [[ "$output" == *"gaeta init"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" init "$uninit_project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"initialized workflow files"* ]]
+
+  run python3 - "$uninit_project" <<'PY'
+import pathlib
+import sys
+
+project = pathlib.Path(sys.argv[1])
+required = [
+    "PROJECT.md",
+    "GAETA.md",
+    "docs/.gaeta/phases.md",
+    "docs/.gaeta/status.md",
+    "docs/.gaeta/checklist.md",
+    "docs/.gaeta/backlog.md",
+]
+for rel in required:
+    path = project / rel
+    assert path.exists(), path
+PY
+  [ "$status" -eq 0 ]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$uninit_project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gaeta resume"* ]]
 }
 
 @test "resume and r show launch prompt context" {

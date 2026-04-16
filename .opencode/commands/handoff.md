@@ -10,6 +10,8 @@ If neither launcher exists, stop and report: `gaeta not found` (recommended fix:
 
 Run `<gaeta-launcher> handoff`.
 
+If command fails due to uninitialized workflow files, run `<gaeta-launcher> init .` and retry.
+
 Then update `docs/.gaeta/handoff.md` by replacing the placeholder bullets in these sections with concise, session-accurate content:
 - `## Project update`
 - `## Conversation summary`

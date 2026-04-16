@@ -51,10 +51,14 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Fixed resume/orchestrator permission gap by allowing `git status *` flags for `discovery`, `orchestrator`, and `plan` profiles.
 - Reduced reviewer permission denials by setting reviewer bash fallback to `ask` (instead of hard deny).
 - Expanded qa/build practical command permissions (`gaeta *`, `python -q`, `pytest`, `make lint`, `make test`; build `todowrite` now allowed).
+- Added `gaeta init` command to scaffold `PROJECT.md`, `GAETA.md`, and `docs/.gaeta/{phases,status,checklist,backlog}.md`.
+- Added initialization guard to fail fast with `gaeta init` guidance when workflow files are missing (`launch`, `resume`, `handoff`, `tasks`, `proposal`).
+- `gaeta doctor` now reports workflow init state and checks `PROJECT.md`/`GAETA.md` presence.
 
 ## In progress
 
-- Add backup snapshot command/script for hard saves.
+- Fix slash-command launcher robustness when `gaeta` is not available in PATH for non-gaeta projects.
+- Re-evaluate backup snapshot scope now that init-first onboarding is implemented.
 
 ## Blockers
 
@@ -62,7 +66,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Add backup snapshot command/script for hard saves.
+Add slash-command launcher fallback/auto-discovery so `/handoff` and related commands work reliably outside the gaeta repo.
 
 ## Decisions
 

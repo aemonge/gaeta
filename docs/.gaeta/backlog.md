@@ -15,3 +15,4 @@
 - [ ] Create a full TUI demo script (with video) that explicitly switches through `discovery`, `orchestrator`, `plan`, `build`, `reviewer`, `qa`, and `evolution`.
 - [ ] Fix slash-command launcher robustness when `gaeta` is not available in PATH from non-gaeta projects (`/handoff` currently fails with `gaeta: command not found` in some sessions).
 - [ ] Evaluate whether `build` should default-allow `todowrite`, `python -q`, and `pytest` in all environments; keep an escape hatch for stricter repos.
+- [ ] Re-evaluate whether backup snapshot should be deprecated now that init-first onboarding and handoff continuity are in place.

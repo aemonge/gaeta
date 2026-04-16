@@ -5,7 +5,7 @@
 - Name: gaeta
 - Direction: OpenCode-safe wrapper with phase-driven, methodology-enforced agent workflow.
 - Current phase: Phase 0 -> Phase 1 handoff.
-- Current sprint: backup snapshot implementation.
+- Current sprint: init-first project onboarding and workflow guards.
 - Diagnostics: `gaeta doctor` (human) and `gaeta doctor --json` (machine-readable) available for self-inspection, with `make lint`/`make test` entrypoints.
 - Install bundle: `make build` installs `opencode.json` plus `.opencode/commands/*.md` and `.opencode/agents/*.md` templates into `~/.config/gaeta`.
 - Terminal UX: interactive runs default to compatibility redraw mode; strict TTY isolation is opt-in via `--strict-tty`.

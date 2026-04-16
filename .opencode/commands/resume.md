@@ -10,6 +10,8 @@ If neither launcher exists, stop and report: `gaeta not found` (recommended fix:
 
 Run `<gaeta-launcher> resume --show .`.
 
+If output indicates project is not initialized, run `<gaeta-launcher> init .` first.
+
 Then provide a concise resume handoff containing:
 - current phase,
 - next step,

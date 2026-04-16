@@ -12,6 +12,8 @@ Create a proposal skeleton with:
 2. Open the generated file under `docs/.gaeta/proposals/`.
 3. Replace all `Pending capture via /propose.` bullets with concise, session-accurate content.
 
+If proposal command fails due to project initialization, run `<gaeta-launcher> init .` first.
+
 Required sections to fill:
 - `## Summary`
 - `## Scope`
