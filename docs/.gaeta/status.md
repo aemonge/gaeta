@@ -54,11 +54,15 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Added `gaeta init` command to scaffold `PROJECT.md`, `GAETA.md`, and `docs/.gaeta/{phases,status,checklist,backlog}.md`.
 - Added initialization guard to fail fast with `gaeta init` guidance when workflow files are missing (`launch`, `resume`, `handoff`, `tasks`, `proposal`).
 - `gaeta doctor` now reports workflow init state and checks `PROJECT.md`/`GAETA.md` presence.
+- Permission model now uses a minimal global bash deny set (interpreter escape + system/destructive commands) and removes brittle raw metacharacter denies.
+- Agent permissions now use explicit allowlists with fallback `ask` for unknown commands; known workflow commands are allow/deny only.
+- `build` agent now denies `git*` to keep commit/push operations human-driven.
 
 ## In progress
 
 - Fix slash-command launcher robustness when `gaeta` is not available in PATH for non-gaeta projects.
 - Re-evaluate backup snapshot scope now that init-first onboarding is implemented.
+- Triage and close remaining TUI agent-permission blockers from full role-switch flow.
 
 ## Blockers
 
@@ -66,7 +70,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Add slash-command launcher fallback/auto-discovery so `/handoff` and related commands work reliably outside the gaeta repo.
+Run a full TUI permission walkthrough (`/resume` -> `plan` -> `build` -> `/review` -> `/qa` -> `/handoff`) and patch remaining blocker rules.
 
 ## Decisions
 
@@ -100,3 +104,5 @@ Add slash-command launcher fallback/auto-discovery so `/handoff` and related com
 - `discovery`, `orchestrator`, and `plan` explicitly allow `git status *` to avoid flag-based permission denials in resume-driven sessions.
 - `reviewer` now prioritizes progress over hard blocks by using bash fallback `ask` for unknown review commands.
 - `qa` now explicitly allows `gaeta` command execution to support diagnostics in non-default command paths.
+- Permission policy strategy is now: minimal shared `deny`, explicit per-agent `allow`, fallback `ask` only for unknown commands.
+- Build agent intentionally denies `git*` to enforce human-in-the-loop repository state changes.

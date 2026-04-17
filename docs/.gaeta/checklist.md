@@ -40,6 +40,9 @@
 - [x] Expand qa/build permissions for practical validation commands (`gaeta *`, `python -q`, `pytest`, `make lint`, `make test`, `todowrite` for build).
 - [x] Add `gaeta init` command to scaffold required workflow files in new projects.
 - [x] Add initialization guard so `launch`, `resume`, `handoff`, `tasks`, and `proposal` fail fast when project workflow files are missing.
+- [x] Replace brittle metacharacter bash denies with minimal interpreter/system global deny rules in `opencode.json`.
+- [x] Convert agent profiles to explicit allowlists with fallback `ask` for unknown commands (no planned per-command asks).
+- [x] Enforce human-in-the-loop git flow by denying `git*` in `build` agent profile.
 
 ## Current
 
