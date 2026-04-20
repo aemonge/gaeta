@@ -396,6 +396,62 @@ PY
   [ "$status" -eq 0 ]
 }
 
+@test "backup writes hard-save backup and excludes runtime artifacts" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" backup "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  local backup_path="${output##*$'\n'}"
+  [[ "$backup_path" == *"docs/.gaeta/backups/backup-"* ]]
+
+  run python3 - "$backup_path" "$TEST_PROJECT" <<'PY'
+import pathlib
+import sys
+
+backup_dir = pathlib.Path(sys.argv[1])
+project = pathlib.Path(sys.argv[2])
+
+required = [
+    "PROJECT.md",
+    "GAETA.md",
+    "docs/.gaeta/phases.md",
+    "docs/.gaeta/status.md",
+    "docs/.gaeta/checklist.md",
+    "docs/.gaeta/backlog.md",
+]
+for rel in required:
+    path = backup_dir / rel
+    assert path.exists(), path
+
+manifest = (backup_dir / "manifest.md").read_text(encoding="utf-8")
+assert "do not assume direct host-home visibility" in manifest, manifest
+assert "## Excluded runtime artifacts" in manifest, manifest
+for rel in [
+    ".gaeta/phase",
+    ".gaeta/command.json",
+    ".gaeta/session.log",
+    ".gaeta/approval.log",
+    ".gaeta/projection/",
+]:
+    assert rel in manifest, manifest
+
+assert not (backup_dir / ".gaeta" / "session.log").exists(), backup_dir
+assert not (backup_dir / ".gaeta" / "projection").exists(), backup_dir
+
+session_log = (project / ".gaeta" / "session.log").read_text(encoding="utf-8")
+assert "backup: wrote docs/.gaeta/backups/backup-" in session_log, session_log
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "backup requires initialized project" {
+  local uninit_project="${TEST_ROOT}/backup-uninitialized"
+  mkdir -p "$uninit_project"
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" backup "$uninit_project"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"requires an initialized gaeta project"* ]]
+  [[ "$output" == *"gaeta init"* ]]
+}
+
 @test "pause slash command runs with build agent" {
   run python3 - "$REPO_ROOT/.opencode/commands/pause.md" <<'PY'
 import pathlib
@@ -478,6 +534,10 @@ expected = {
 for name, marker in expected.items():
     text = (commands / name).read_text(encoding="utf-8")
     assert marker in text, (name, marker)
+
+review_text = (commands / "review.md").read_text(encoding="utf-8")
+assert "Suggested commit:" in review_text, review_text
+assert "Conventional Commit" in review_text, review_text
 
 config = json.loads((repo / "opencode.json").read_text(encoding="utf-8"))
 for agent_name in ["plan", "build", "review"]:

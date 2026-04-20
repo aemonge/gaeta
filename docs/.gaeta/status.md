@@ -67,11 +67,14 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Added `gaeta status` plus OpenCode `/status` command to report current phase, next step, top pending sprint items, and blockers from `docs/.gaeta/*`.
 - Extended `make legacy-clean` to remove stale legacy agent templates (`architect.md`, `implementer.md`, `handoff-writer.md`) from `~/.config/gaeta/agents`.
 - Added a deferred backlog item to make command/agent prompt templates bubblewrap-aware about host-home path isolation.
+- Added `gaeta backup` command to create hard-save backups under `docs/.gaeta/backups/backup-<UTC>/`.
+- Backup manifest now documents included workflow files plus explicit runtime exclusions (`.gaeta/session.log`, `.gaeta/approval.log`, `.gaeta/command.json`, `.gaeta/projection/`).
+- Updated `/review` command contract so successful reviews proactively include a Conventional Commit suggestion.
+- Improved `gaeta backup` UX output with human-readable stderr guidance while keeping stdout as the absolute backup directory path for scripting.
 
 ## In progress
 
-- Triage and close remaining TUI permission blockers in the new `plan -> build -> review` flow.
-- Finalize `/evolve` command behavior and approval guidance UX.
+- Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
 
 ## Blockers
 
@@ -79,7 +82,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Run a full TUI permission walkthrough (`/resume` -> `plan` -> `build` -> `/review` -> `/pause`) and patch remaining blocker rules.
+Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
 
 ## Decisions
 
@@ -114,3 +117,6 @@ Run a full TUI permission walkthrough (`/resume` -> `plan` -> `build` -> `/revie
 - `qa` now explicitly allows `gaeta` command execution to support diagnostics in non-default command paths.
 - Permission policy strategy is now: minimal shared `deny`, explicit per-agent `allow`, fallback `ask` only for unknown commands.
 - Build agent intentionally denies `git*` to enforce human-in-the-loop repository state changes.
+- Hard-save feature naming is now `backup` (not `snapshot`) for command/help/test consistency.
+- Backup output/manifest wording must stay project-relative and must not assume direct host-home visibility under bubblewrap.
+- Successful `/review` runs should include a single `Suggested commit:` Conventional Commit line when no blocking issues are found.

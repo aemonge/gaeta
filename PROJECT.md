@@ -17,10 +17,11 @@
 - Operator slash commands are now: `/resume`, `/status`, `/pause`, `/review`, `/evolve`.
 - Proposal workflow remains available via `gaeta proposal create|list|approve|reject` with artifacts under `docs/.gaeta/proposals/`.
 - OpenCode agent roster is now minimal and role-aligned: `plan`, `build`, `review`.
+- Hard-save backups are now available via `gaeta backup [PROJECT_DIR]` under `docs/.gaeta/backups/` with a manifest documenting explicit runtime exclusions.
 
 ## Next Step
 
-Add backup snapshot command/script for hard saves.
+Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
 
 ## Resume Prompt
 

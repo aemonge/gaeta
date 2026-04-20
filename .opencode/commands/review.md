@@ -21,3 +21,6 @@ Then reply with a concise review bundle:
 - validation results or gaps,
 - recommended human checks before commit,
 - a short manual showcase describing how a human can run and verify the feature.
+
+If checks pass without blocking issues, proactively add:
+- `Suggested commit:` with one Conventional Commit message (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`) aligned to the reviewed changes.

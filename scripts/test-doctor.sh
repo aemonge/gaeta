@@ -242,12 +242,23 @@ LEGACY_RESUME_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$TEST_PROJ
 HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
 STATUS_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" status "$TEST_PROJECT")"
 HOME="$TEST_HOME" "$GAETA_BIN" pause "$TEST_PROJECT"
+BACKUP_PATH="$(HOME="$TEST_HOME" "$GAETA_BIN" backup "$TEST_PROJECT")"
 proposal_one="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Build a terminal todo list MVP")"
 HOME="$TEST_HOME" "$GAETA_BIN" proposal approve "$TEST_PROJECT" latest >/dev/null
 proposal_two="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Implement a ping-pong score tracker")"
 HOME="$TEST_HOME" "$GAETA_BIN" proposal reject "$TEST_PROJECT" latest "Need tighter validation" >/dev/null
 
-python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" "$STATUS_OUTPUT" <<'PY'
+UNINIT_BACKUP_PROJECT="${TEST_ROOT}/backup-uninitialized"
+mkdir -p "$UNINIT_BACKUP_PROJECT"
+set +e
+UNINIT_BACKUP_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" backup "$UNINIT_BACKUP_PROJECT" 2>&1)"
+UNINIT_BACKUP_STATUS=$?
+set -e
+[[ "$UNINIT_BACKUP_STATUS" -ne 0 ]]
+[[ "$UNINIT_BACKUP_OUTPUT" == *"requires an initialized gaeta project"* ]]
+[[ "$UNINIT_BACKUP_OUTPUT" == *"gaeta init"* ]]
+
+python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" "$STATUS_OUTPUT" "$BACKUP_PATH" <<'PY'
 import json
 import pathlib
 import sys
@@ -257,12 +268,14 @@ proposal_one = pathlib.Path(sys.argv[2])
 proposal_two = pathlib.Path(sys.argv[3])
 repo_root = pathlib.Path(sys.argv[4])
 status_output = sys.argv[5]
+backup_dir = pathlib.Path(sys.argv[6])
 status_text = (project / "docs" / ".gaeta" / "status.md").read_text(encoding="utf-8")
 pause_text = (project / "docs" / ".gaeta" / "pause.md").read_text(encoding="utf-8")
 project_text = (project / "PROJECT.md").read_text(encoding="utf-8")
 session_log = (project / ".gaeta" / "session.log").read_text(encoding="utf-8")
 proposal_one_text = proposal_one.read_text(encoding="utf-8")
 proposal_two_text = proposal_two.read_text(encoding="utf-8")
+manifest_text = (backup_dir / "manifest.md").read_text(encoding="utf-8")
 
 assert "## In progress" in status_text, status_text
 assert "Implement sync behavior." in status_text, status_text
@@ -276,6 +289,23 @@ assert "# Pause" in pause_text, pause_text
 assert "Phase X" in pause_text, pause_text
 assert "## Next Step" in project_text, project_text
 assert "pause: synced status and wrote docs/.gaeta/pause.md" in session_log, session_log
+assert "backup: wrote docs/.gaeta/backups/backup-" in session_log, session_log
+
+required_backup = [
+    "PROJECT.md",
+    "GAETA.md",
+    "docs/.gaeta/phases.md",
+    "docs/.gaeta/status.md",
+    "docs/.gaeta/checklist.md",
+    "docs/.gaeta/backlog.md",
+]
+for rel in required_backup:
+    assert (backup_dir / rel).exists(), rel
+
+assert "do not assume direct host-home visibility" in manifest_text, manifest_text
+assert "## Excluded runtime artifacts" in manifest_text, manifest_text
+assert not (backup_dir / ".gaeta" / "session.log").exists(), backup_dir
+assert not (backup_dir / ".gaeta" / "projection").exists(), backup_dir
 
 assert "- Status: approved" in proposal_one_text, proposal_one_text
 assert "approved via gaeta proposal approve" in proposal_one_text, proposal_one_text
@@ -294,6 +324,10 @@ expected = {
 for name, marker in expected.items():
     text = (commands_dir / name).read_text(encoding="utf-8")
     assert marker in text, (name, marker)
+
+review_text = (commands_dir / "review.md").read_text(encoding="utf-8")
+assert "Suggested commit:" in review_text, review_text
+assert "Conventional Commit" in review_text, review_text
 
 config = json.loads((repo_root / "opencode.json").read_text(encoding="utf-8"))
 for agent_name in ["plan", "build", "review"]:

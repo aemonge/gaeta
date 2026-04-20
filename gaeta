@@ -29,6 +29,7 @@ Usage:
   gaeta init [--force] [PROJECT_DIR]
   gaeta doctor [PROJECT_DIR]
   gaeta status [PROJECT_DIR]
+  gaeta backup [PROJECT_DIR]
   gaeta resume [--show] [PROJECT_DIR]
   gaeta r [--show] [PROJECT_DIR]
   gaeta pause [PROJECT_DIR]
@@ -40,6 +41,7 @@ Options:
   init                  Initialize gaeta workflow files in a project
   doctor                 Run gaeta self-inspection checks
   status                 Show phase, next step, pending sprint items, blockers
+  backup                 Write a hard-save backup of workflow files
   resume, r              Show phase/next-step resume context
   pause                  Sync workflow docs and write pause snapshot
   proposal               Manage approval-gated proposal artifacts
@@ -137,6 +139,8 @@ Examples:
   gaeta doctor ../repo     # inspect another project
   gaeta status             # show current phase/next/pending/blockers
   gaeta status ../repo     # show status for another project
+  gaeta backup             # write hard-save backup under docs/.gaeta/backups
+  gaeta backup ../repo     # write backup for another project
   gaeta resume             # launch opencode with resume prompt
   gaeta resume --show      # show resolved resume command without launching
   GAETA_RESUME_AGENT=plan gaeta r --show # preview resume agent launch
@@ -1212,6 +1216,136 @@ run_tasks_command() {
 
   warning "mdt unavailable or fallback forced; using built-in fallback tasks mode"
   run_tasks_fallback "${checklist_path}" "${status_path}" "${task_args[@]}"
+}
+
+run_backup_command() {
+  local target_project="${PWD}"
+  local -a backup_positionals=()
+
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'BACKUP_HELP'
+Usage:
+  gaeta backup [PROJECT_DIR]
+
+Writes a hard-save backup for workflow continuity under:
+  - docs/.gaeta/backups/backup-<UTC_TIMESTAMP>/
+
+Includes core workflow files and a manifest with explicit exclusions.
+Prints the absolute backup directory path for scripting.
+BACKUP_HELP
+    return 0
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    backup_positionals+=("$1")
+    shift
+  done
+
+  if [[ ${#backup_positionals[@]} -gt 1 ]]; then
+    error "backup accepts at most one optional PROJECT_DIR"
+    return 1
+  fi
+
+  if [[ ${#backup_positionals[@]} -eq 1 ]]; then
+    target_project="${backup_positionals[0]}"
+  fi
+
+  if [[ ! -d "${target_project}" ]]; then
+    error "backup project directory does not exist: ${target_project}"
+    return 1
+  fi
+
+  target_project="$(realpath "${target_project}")"
+  if ! require_project_initialized "${target_project}" "backup"; then
+    return 1
+  fi
+
+  local gaeta_dir="${target_project}/docs/.gaeta"
+  local backups_root="${gaeta_dir}/backups"
+  local backup_ts
+  backup_ts="$(date -u +"%Y%m%dT%H%M%SZ")"
+  local backup_id="backup-${backup_ts}"
+  local backup_dir="${backups_root}/${backup_id}"
+  local runtime_log="${target_project}/.gaeta/session.log"
+
+  mkdir -p "${backups_root}"
+  if [[ -e "${backup_dir}" ]]; then
+    backup_id="${backup_id}-$$"
+    backup_dir="${backups_root}/${backup_id}"
+  fi
+  mkdir -p "${backup_dir}"
+
+  local -a required_files=(
+    "PROJECT.md"
+    "GAETA.md"
+    "docs/.gaeta/phases.md"
+    "docs/.gaeta/status.md"
+    "docs/.gaeta/checklist.md"
+    "docs/.gaeta/backlog.md"
+  )
+  local -a optional_files=(
+    "docs/.gaeta/pause.md"
+  )
+  local -a excluded_runtime=(
+    ".gaeta/phase"
+    ".gaeta/command.json"
+    ".gaeta/session.log"
+    ".gaeta/approval.log"
+    ".gaeta/projection/"
+  )
+
+  local rel
+  local src
+  local dst
+  for rel in "${required_files[@]}"; do
+    src="${target_project}/${rel}"
+    dst="${backup_dir}/${rel}"
+    if [[ ! -f "${src}" ]]; then
+      error "backup missing required file: ${src}"
+      return 1
+    fi
+    mkdir -p "$(dirname "${dst}")"
+    cp -p "${src}" "${dst}"
+  done
+
+  for rel in "${optional_files[@]}"; do
+    src="${target_project}/${rel}"
+    dst="${backup_dir}/${rel}"
+    if [[ -f "${src}" ]]; then
+      mkdir -p "$(dirname "${dst}")"
+      cp -p "${src}" "${dst}"
+    fi
+  done
+
+  {
+    printf '# Backup Manifest\n\n'
+    printf -- '- Backup ID: %s\n' "${backup_id}"
+    printf -- '- Generated (UTC): %s\n' "${backup_ts}"
+    printf -- '- Project path: %s\n' "${target_project}"
+    printf -- '- Context note: paths are project-relative and do not assume direct host-home visibility.\n\n'
+    printf '## Included required files\n\n'
+    for rel in "${required_files[@]}"; do
+      printf -- "- \`%s\`\n" "${rel}"
+    done
+    printf '\n## Included optional files\n\n'
+    for rel in "${optional_files[@]}"; do
+      if [[ -f "${target_project}/${rel}" ]]; then
+        printf -- "- \`%s\`\n" "${rel}"
+      fi
+    done
+    printf '\n## Excluded runtime artifacts\n\n'
+    for rel in "${excluded_runtime[@]}"; do
+      printf -- "- \`%s\`\n" "${rel}"
+    done
+  } >"${backup_dir}/manifest.md"
+
+  mkdir -p "$(dirname "${runtime_log}")"
+  printf '[%s] backup: wrote docs/.gaeta/backups/%s\n' "$(date -Iseconds)" "${backup_id}" >>"${runtime_log}"
+
+  info "backup created for project: ${target_project}"
+  info "backup directory: ${backup_dir}"
+  printf '%s\n' "${backup_dir}"
+  return 0
 }
 
 run_pause_command() {
@@ -3155,6 +3289,15 @@ fi
 if [[ "${1:-}" == "status" ]]; then
   shift
   if ! run_status_command "$@"; then
+    exit 1
+  fi
+  exit 0
+fi
+
+# Command dispatch: gaeta backup ...
+if [[ "${1:-}" == "backup" ]]; then
+  shift
+  if ! run_backup_command "$@"; then
     exit 1
   fi
   exit 0
