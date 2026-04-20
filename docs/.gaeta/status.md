@@ -57,12 +57,18 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Permission model now uses a minimal global bash deny set (interpreter escape + system/destructive commands) and removes brittle raw metacharacter denies.
 - Agent permissions now use explicit allowlists with fallback `ask` for unknown commands; known workflow commands are allow/deny only.
 - `build` agent now denies `git*` to keep commit/push operations human-driven.
+- Agent roster is now hard-cut to `plan`, `build`, and `review`.
+- Slash command surface is now hard-cut to `/resume`, `/pause`, `/review`, and `/evolve`.
+- `gaeta pause` now replaces `gaeta handoff` and writes `docs/.gaeta/pause.md` for resume continuity.
+- `gaeta resume` now uses `docs/.gaeta/pause.md` context only (no legacy `docs/.gaeta/handoff.md` fallback).
+- Added `make legacy-clean` to remove legacy command/agent templates from `~/.config/gaeta`; `make build` now runs it before installing current templates.
+- Fixed doctor sandbox probe argument forwarding so non-OpenCode binaries (for example `-b /bin/bash` in the nested doctor check) no longer receive injected `--agent`, removing `/bin/bash: --agent: invalid option` noise.
+- Normalized `tests/doctor.bats` with shellharden-compatible quoting/expansions so `make lint` no longer fails at the shellharden gate.
 
 ## In progress
 
-- Fix slash-command launcher robustness when `gaeta` is not available in PATH for non-gaeta projects.
-- Re-evaluate backup snapshot scope now that init-first onboarding is implemented.
-- Triage and close remaining TUI agent-permission blockers from full role-switch flow.
+- Triage and close remaining TUI permission blockers in the new `plan -> build -> review` flow.
+- Finalize `/evolve` command behavior and approval guidance UX.
 
 ## Blockers
 
@@ -70,7 +76,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Run a full TUI permission walkthrough (`/resume` -> `plan` -> `build` -> `/review` -> `/qa` -> `/handoff`) and patch remaining blocker rules.
+Run a full TUI permission walkthrough (`/resume` -> `plan` -> `build` -> `/review` -> `/pause`) and patch remaining blocker rules.
 
 ## Decisions
 
@@ -84,7 +90,7 @@ Run a full TUI permission walkthrough (`/resume` -> `plan` -> `build` -> `/revie
 - Doctor output modes are now dual: human-readable default and JSON via `--json`.
 - Doctor JSON and human outputs now share the same check collection source and differ only in rendering.
 - TTY session policy is now explicit and observable (`compat`/`strict`) in doctor output and `.gaeta/command.json`.
-- Session handoff prompt is executable via `gaeta resume` with default `orchestrator` agent (inspectable via `gaeta resume --show`).
+- Session resume prompt is executable via `gaeta resume` with default `plan` agent (inspectable via `gaeta resume --show`).
 - `docs/.gaeta/` is the canonical repository workflow control plane.
 - Markdown checklists are the workflow task system.
 - Self-updating behavior is approval-gated only.
@@ -93,13 +99,12 @@ Run a full TUI permission walkthrough (`/resume` -> `plan` -> `build` -> `/revie
 - `sem` is the preferred semantic diff dependency; gaeta should fall back to `git diff` if unavailable.
 - Handoff updates are implemented as an explicit wrapper command (`gaeta handoff`) plus a per-project OpenCode slash-command template (`.opencode/commands/handoff.md`).
 - Updated root permission baseline to avoid build-agent deadlocks caused by overly narrow `external_directory`/`edit` patterns.
-- Keep `/handoff` as the only handoff slash command (no alias commands).
-- `/handoff` executes under `orchestrator` policy to avoid command-only agent sprawl.
-- Approval-gated evolution flow is file-first and explicit: proposals are created and state-transitioned via `gaeta proposal` (`pending` -> `approved` or `rejected`) under `docs/.gaeta/proposals/`.
-- New operator slash commands are split by intent: review (`/review`, `/qa`, with `/check` and `/doctor` aliases), governance (`/propose`, `/approve`, `/reject`), and context (`/resume`).
-- Agent roster is core-only: `discovery`, `orchestrator`, `plan`, `build`, `reviewer`, `qa`, `evolution`.
-- Bare `gaeta` sessions default to `discovery` unless an explicit `--agent` is passed.
-- `gaeta resume` defaults to `orchestrator` for role-based continuation.
+- Keep `/pause` as the canonical pause/checkpoint slash command.
+- Approval-gated evolution remains file-first via `gaeta proposal` artifacts, exposed through `/evolve` UX.
+- Operator slash commands are now: `/resume`, `/pause`, `/review`, `/evolve`.
+- Agent roster is minimal: `plan`, `build`, `review`.
+- Bare `gaeta` sessions default to `plan` unless an explicit `--agent` is passed.
+- `gaeta resume` defaults to `plan`.
 - `plan` and `build` are now intentional core profiles: `plan` for architecture/planning and `build` for implementation.
 - `discovery`, `orchestrator`, and `plan` explicitly allow `git status *` to avoid flag-based permission denials in resume-driven sessions.
 - `reviewer` now prioritizes progress over hard blocks by using bash fallback `ask` for unknown review commands.

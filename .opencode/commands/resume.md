@@ -1,6 +1,6 @@
 ---
 description: Show gaeta resume context and launch preview
-agent: orchestrator
+agent: plan
 ---
 Resolve gaeta launcher in this order:
 1. `./gaeta` when present in current project root.

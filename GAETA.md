@@ -44,19 +44,19 @@ At session end:
 
 ## Operator Slash Commands
 
-- Canonical handoff: `/handoff`.
-- Review and diagnostics: `/review`, `/qa`.
-- Compatibility aliases: `/check` (review), `/doctor` (qa diagnostics).
-- Approval-gated evolution: `/propose`, `/approve`, `/reject`.
-- Resume context preview: `/resume`.
+- Session resume: `/resume`.
+- Session checkpoint: `/pause`.
+- Implementation review and validation: `/review`.
+- Agent/workflow evolution: `/evolve`.
 
 ## Agent Roles
 
-- gaeta-native roles: `discovery`, `orchestrator`, `plan`, `build`, `reviewer`, `qa`, `evolution`.
-- `plan` maps to architecture/planning behavior.
-- `build` maps to implementation behavior.
-- Bare `gaeta` defaults to `--agent discovery` when no agent is provided.
-- `gaeta resume` defaults to `--agent orchestrator`.
+- gaeta-native roles: `plan`, `build`, `review`.
+- `plan`: think, refine, design, and slice with goals + acceptance criteria.
+- `build`: implement approved slices.
+- `review`: inspect diffs, validate behavior, and provide manual showcase steps.
+- Bare `gaeta` defaults to `--agent plan` when no agent is provided.
+- `gaeta resume` defaults to `--agent plan`.
 
 ## Source of Truth
 

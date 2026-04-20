@@ -1,6 +1,6 @@
 ---
-description: Run reviewer diff and risk analysis
-agent: reviewer
+description: Inspect, validate, and describe manual verification
+agent: review
 ---
 Resolve gaeta launcher in this order:
 1. `./gaeta` when present in current project root.
@@ -18,5 +18,6 @@ Run these checks in order:
 Then reply with a concise review bundle:
 - changed files,
 - highest-risk diffs,
-- validation gaps,
-- recommended human checks before commit.
+- validation results or gaps,
+- recommended human checks before commit,
+- a short manual showcase describing how a human can run and verify the feature.

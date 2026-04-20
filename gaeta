@@ -30,7 +30,7 @@ Usage:
   gaeta doctor [PROJECT_DIR]
   gaeta resume [--show] [PROJECT_DIR]
   gaeta r [--show] [PROJECT_DIR]
-  gaeta handoff [PROJECT_DIR]
+  gaeta pause [PROJECT_DIR]
   gaeta proposal <create|list|approve|reject> [ARGS...]
   gaeta tasks [TASK_ARGS...]
   gaeta [options] [PROJECT_DIR] [-- [OPENCODE_ARGS...]]
@@ -39,7 +39,7 @@ Options:
   init                  Initialize gaeta workflow files in a project
   doctor                 Run gaeta self-inspection checks
   resume, r              Show phase/next-step resume context
-  handoff                Sync workflow docs and write handoff snapshot
+  pause                  Sync workflow docs and write pause snapshot
   proposal               Manage approval-gated proposal artifacts
   tasks                  Run task workflow via mdt (with fallback)
   -h, --help              Show this help and exit
@@ -86,8 +86,8 @@ Environment:
   GAETA_TASKS_FORCE_FALLBACK  "1" to bypass mdt and use built-in tasks fallback
   GAETA_DOCTOR_SKIP_SANDBOX   "1" to skip nested sandbox check in gaeta doctor
   GAETA_TTY_MODE         "auto" (default), "compat", or "strict"
-  GAETA_DEFAULT_AGENT    Default agent when none is provided (default: "discovery")
-  GAETA_RESUME_AGENT     Resume agent name (default: "orchestrator")
+  GAETA_DEFAULT_AGENT    Default agent when none is provided (default: "plan")
+  GAETA_RESUME_AGENT     Resume agent name (default: "plan")
 
 Protected Directories (read-only by default):
   .git, .turbo, .next, dist, build, target, .cargo
@@ -135,16 +135,16 @@ Examples:
   gaeta doctor ../repo     # inspect another project
   gaeta resume             # launch opencode with resume prompt
   gaeta resume --show      # show resolved resume command without launching
-  GAETA_RESUME_AGENT=orchestrator gaeta r --show # preview resume agent launch
+  GAETA_RESUME_AGENT=plan gaeta r --show # preview resume agent launch
   gaeta r                  # short alias for resume
-  gaeta handoff            # sync docs/.gaeta status + write handoff snapshot
+  gaeta pause              # sync docs/.gaeta status + write pause snapshot
   gaeta proposal create . "Build a terminal todo list MVP"  # draft proposal
   gaeta proposal list .    # list proposal files and statuses
   gaeta proposal approve . latest # approve newest pending proposal
   gaeta proposal reject . latest "Needs tighter scope" # reject newest pending proposal
   gaeta tasks              # run mdt in docs/.gaeta (or fallback view)
   gaeta tasks -m           # add multiple tasks via mdt
-  gaeta                    # rw sandbox of $PWD using default --agent discovery
+  gaeta                    # rw sandbox of $PWD using default --agent plan
   gaeta --validate         # run comprehensive validation tests
   gaeta --ro               # read-only sandbox of $PWD
   gaeta --allow-git        # allow .git writes
@@ -658,9 +658,20 @@ has_agent_argument() {
 }
 
 apply_default_agent_if_needed() {
-  local default_agent="${GAETA_DEFAULT_AGENT:-discovery}"
+  local opencode_bin_name
+  opencode_bin_name=$(basename -- "${OPENCODE_BIN}")
+
+  case "${opencode_bin_name}" in
+    opencode | opencode-*)
+      ;;
+    *)
+      return
+      ;;
+  esac
+
+  local default_agent="${GAETA_DEFAULT_AGENT:-plan}"
   if [[ -z "${default_agent}" ]]; then
-    default_agent="discovery"
+    default_agent="plan"
   fi
 
   if has_agent_argument "${OPENCODE_ARGS[@]}"; then
@@ -1199,50 +1210,50 @@ run_tasks_command() {
   run_tasks_fallback "${checklist_path}" "${status_path}" "${task_args[@]}"
 }
 
-run_handoff_command() {
+run_pause_command() {
   local target_project="${PWD}"
-  local -a handoff_positionals=()
+  local -a pause_positionals=()
 
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    cat <<'HANDOFF_HELP'
+    cat <<'PAUSE_HELP'
 Usage:
-  gaeta handoff [PROJECT_DIR]
+  gaeta pause [PROJECT_DIR]
 
-Synchronizes workflow state and writes a handoff snapshot:
+Synchronizes workflow state and writes a pause snapshot:
   - sync docs/.gaeta/status.md from docs/.gaeta/checklist.md
-  - write docs/.gaeta/handoff.md
+  - write docs/.gaeta/pause.md
   - sync PROJECT.md Next Step and Snapshot phase (when present)
-HANDOFF_HELP
+PAUSE_HELP
     return 0
   fi
 
   while [[ $# -gt 0 ]]; do
-    handoff_positionals+=("$1")
+    pause_positionals+=("$1")
     shift
   done
 
-  if [[ ${#handoff_positionals[@]} -gt 1 ]]; then
-    error "handoff accepts at most one optional PROJECT_DIR"
+  if [[ ${#pause_positionals[@]} -gt 1 ]]; then
+    error "pause accepts at most one optional PROJECT_DIR"
     return 1
   fi
 
-  if [[ ${#handoff_positionals[@]} -eq 1 ]]; then
-    target_project="${handoff_positionals[0]}"
+  if [[ ${#pause_positionals[@]} -eq 1 ]]; then
+    target_project="${pause_positionals[0]}"
   fi
 
   if [[ ! -d "${target_project}" ]]; then
-    error "handoff project directory does not exist: ${target_project}"
+    error "pause project directory does not exist: ${target_project}"
     return 1
   fi
 
   if ! command -v python3 >/dev/null 2>&1; then
-    error "python3 is required for handoff command"
+    error "python3 is required for pause command"
     return 1
   fi
 
   target_project="$(realpath "${target_project}")"
 
-  if ! require_project_initialized "${target_project}" "handoff"; then
+  if ! require_project_initialized "${target_project}" "pause"; then
     return 1
   fi
 
@@ -1250,15 +1261,15 @@ HANDOFF_HELP
   local checklist_path="${gaeta_dir}/checklist.md"
   local status_path="${gaeta_dir}/status.md"
   local backlog_path="${gaeta_dir}/backlog.md"
-  local handoff_path="${gaeta_dir}/handoff.md"
+  local pause_path="${gaeta_dir}/pause.md"
   local project_path="${target_project}/PROJECT.md"
   local runtime_log="${target_project}/.gaeta/session.log"
 
-  if ! sync_status_from_checklist "${checklist_path}" "${status_path}" "handoff"; then
+  if ! sync_status_from_checklist "${checklist_path}" "${status_path}" "pause"; then
     return 1
   fi
 
-  if ! python3 - "${checklist_path}" "${status_path}" "${backlog_path}" "${handoff_path}" "${project_path}" <<'PY'; then
+  if ! python3 - "${checklist_path}" "${status_path}" "${backlog_path}" "${pause_path}" "${project_path}" <<'PY'; then
 import datetime
 import pathlib
 import re
@@ -1306,7 +1317,7 @@ def replace_or_append_section(text: str, heading: str, body: str) -> str:
 checklist_path = pathlib.Path(sys.argv[1])
 status_path = pathlib.Path(sys.argv[2])
 backlog_path = pathlib.Path(sys.argv[3])
-handoff_path = pathlib.Path(sys.argv[4])
+pause_path = pathlib.Path(sys.argv[4])
 project_path = pathlib.Path(sys.argv[5])
 
 status_text = status_path.read_text(encoding="utf-8") if status_path.exists() else ""
@@ -1344,22 +1355,22 @@ else:
     backlog_body = "- none"
 
 timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
-handoff_text = (
-    "# Handoff\n\n"
+pause_text = (
+    "# Pause\n\n"
     f"- Generated: {timestamp}\n"
-    "- Trigger: gaeta handoff\n\n"
+    "- Trigger: gaeta pause\n\n"
     "## Current phase\n\n"
     f"{phase_value}\n\n"
     "## Project update\n\n"
-    "- Pending capture via /handoff.\n\n"
+    "- Pending capture via /pause.\n\n"
     "## Conversation summary\n\n"
-    "- Pending capture via /handoff.\n\n"
+    "- Pending capture via /pause.\n\n"
     "## Attempts and outcomes\n\n"
-    "- Pending capture via /handoff.\n\n"
+    "- Pending capture via /pause.\n\n"
     "## Decisions\n\n"
-    "- Pending capture via /handoff.\n\n"
+    "- Pending capture via /pause.\n\n"
     "## Frozen items\n\n"
-    "- Pending capture via /handoff.\n\n"
+    "- Pending capture via /pause.\n\n"
     "## Next step\n\n"
     f"{next_step_value}\n\n"
     "## Top pending sprint items\n\n"
@@ -1370,8 +1381,8 @@ handoff_text = (
     f"{backlog_body}\n"
 )
 
-handoff_path.parent.mkdir(parents=True, exist_ok=True)
-handoff_path.write_text(handoff_text, encoding="utf-8")
+pause_path.parent.mkdir(parents=True, exist_ok=True)
+pause_path.write_text(pause_text, encoding="utf-8")
 
 if project_path.exists():
     project_text = project_path.read_text(encoding="utf-8")
@@ -1383,16 +1394,16 @@ if project_path.exists():
     project_updated = replace_or_append_section(project_updated, "Next Step", next_step_value)
     project_path.write_text(project_updated if project_updated.endswith("\n") else project_updated + "\n", encoding="utf-8")
 
-print(f"wrote {handoff_path}")
+print(f"wrote {pause_path}")
 PY
-    error "failed to write handoff snapshot"
+    error "failed to write pause snapshot"
     return 1
   fi
 
   mkdir -p "$(dirname "${runtime_log}")"
-  printf '[%s] handoff: synced status and wrote docs/.gaeta/handoff.md\n' "$(date -Iseconds)" >>"${runtime_log}"
+  printf '[%s] pause: synced status and wrote docs/.gaeta/pause.md\n' "$(date -Iseconds)" >>"${runtime_log}"
 
-  info "handoff updated: ${status_path} and ${handoff_path}"
+  info "pause updated: ${status_path} and ${pause_path}"
   return 0
 }
 
@@ -2083,10 +2094,14 @@ if not isinstance(agent, dict):
     print("warn\tagent map missing")
     raise SystemExit(0)
 
-required = ["discovery", "orchestrator", "plan", "build", "reviewer", "qa", "evolution"]
+required = ["plan", "build", "review"]
 missing = [key for key in required if not isinstance(agent.get(key), dict)]
 
-deprecated = [key for key in ("architect", "implementer", "handoff-writer") if key in agent and agent.get(key) is not None]
+deprecated = [
+    key
+    for key in ("discovery", "orchestrator", "reviewer", "qa", "evolution", "architect", "implementer", "handoff-writer")
+    if key in agent and agent.get(key) is not None
+]
 
 if missing:
     print("warn\tmissing core profiles: " + ", ".join(missing))
@@ -2268,7 +2283,7 @@ run_resume_command() {
   local project_file
   local status_file
   local checklist_file
-  local handoff_file
+  local pause_file
   local resume_prompt
   local opencode_bin
   local resume_agent
@@ -2315,7 +2330,7 @@ RESUME_HELP
   fi
   status_file="${target_project}/docs/.gaeta/status.md"
   checklist_file="${target_project}/docs/.gaeta/checklist.md"
-  handoff_file="${target_project}/docs/.gaeta/handoff.md"
+  pause_file="${target_project}/docs/.gaeta/pause.md"
   project_file="${target_project}/PROJECT.md"
 
   if ! command -v python3 >/dev/null 2>&1; then
@@ -2324,7 +2339,7 @@ RESUME_HELP
   fi
 
   resume_prompt=$(
-    python3 - "${project_file}" "${status_file}" "${checklist_file}" "${handoff_file}" <<'PY'
+    python3 - "${project_file}" "${status_file}" "${checklist_file}" "${pause_file}" <<'PY'
 import pathlib
 import re
 import sys
@@ -2346,31 +2361,31 @@ def section_body(text: str, heading: str) -> str:
 project_path = pathlib.Path(sys.argv[1])
 status_path = pathlib.Path(sys.argv[2])
 checklist_path = pathlib.Path(sys.argv[3])
-handoff_path = pathlib.Path(sys.argv[4])
+pause_path = pathlib.Path(sys.argv[4])
 
 project_text = project_path.read_text(encoding="utf-8") if project_path.exists() else ""
 status_text = status_path.read_text(encoding="utf-8") if status_path.exists() else ""
 checklist_text = checklist_path.read_text(encoding="utf-8") if checklist_path.exists() else ""
-handoff_text = handoff_path.read_text(encoding="utf-8") if handoff_path.exists() else ""
+snapshot_text = pause_path.read_text(encoding="utf-8") if pause_path.exists() else ""
 
-handoff_phase = section_body(handoff_text, "Current phase")
-handoff_next = section_body(handoff_text, "Next step")
-handoff_project_update = section_body(handoff_text, "Project update")
-handoff_conversation = section_body(handoff_text, "Conversation summary")
-handoff_attempts = section_body(handoff_text, "Attempts and outcomes")
-handoff_decisions = section_body(handoff_text, "Decisions")
-handoff_frozen = section_body(handoff_text, "Frozen items")
-handoff_blockers = section_body(handoff_text, "Blockers")
+snapshot_phase = section_body(snapshot_text, "Current phase")
+snapshot_next = section_body(snapshot_text, "Next step")
+snapshot_project_update = section_body(snapshot_text, "Project update")
+snapshot_conversation = section_body(snapshot_text, "Conversation summary")
+snapshot_attempts = section_body(snapshot_text, "Attempts and outcomes")
+snapshot_decisions = section_body(snapshot_text, "Decisions")
+snapshot_frozen = section_body(snapshot_text, "Frozen items")
+snapshot_blockers = section_body(snapshot_text, "Blockers")
 
-if handoff_text and (handoff_project_update or handoff_conversation or handoff_attempts or handoff_decisions or handoff_frozen):
-    phase_value = " ".join(line.strip() for line in handoff_phase.splitlines() if line.strip()) or "unknown"
-    next_value = " ".join(line.strip() for line in handoff_next.splitlines() if line.strip()) or "(not defined)"
-    project_update_value = " ".join(line.strip() for line in handoff_project_update.splitlines() if line.strip()) or "(not recorded)"
-    conversation_value = " ".join(line.strip() for line in handoff_conversation.splitlines() if line.strip()) or "(not recorded)"
-    attempts_value = " ".join(line.strip() for line in handoff_attempts.splitlines() if line.strip()) or "(not recorded)"
-    decisions_value = " ".join(line.strip() for line in handoff_decisions.splitlines() if line.strip()) or "(not recorded)"
-    frozen_value = " ".join(line.strip() for line in handoff_frozen.splitlines() if line.strip()) or "(none)"
-    blockers_value = " ".join(line.strip() for line in handoff_blockers.splitlines() if line.strip()) or "(none)"
+if snapshot_text and (snapshot_project_update or snapshot_conversation or snapshot_attempts or snapshot_decisions or snapshot_frozen):
+    phase_value = " ".join(line.strip() for line in snapshot_phase.splitlines() if line.strip()) or "unknown"
+    next_value = " ".join(line.strip() for line in snapshot_next.splitlines() if line.strip()) or "(not defined)"
+    project_update_value = " ".join(line.strip() for line in snapshot_project_update.splitlines() if line.strip()) or "(not recorded)"
+    conversation_value = " ".join(line.strip() for line in snapshot_conversation.splitlines() if line.strip()) or "(not recorded)"
+    attempts_value = " ".join(line.strip() for line in snapshot_attempts.splitlines() if line.strip()) or "(not recorded)"
+    decisions_value = " ".join(line.strip() for line in snapshot_decisions.splitlines() if line.strip()) or "(not recorded)"
+    frozen_value = " ".join(line.strip() for line in snapshot_frozen.splitlines() if line.strip()) or "(none)"
+    blockers_value = " ".join(line.strip() for line in snapshot_blockers.splitlines() if line.strip()) or "(none)"
 
     resume_prompt = (
         f"Phase: {phase_value}. Next: {next_value}. "
@@ -2427,10 +2442,10 @@ PY
   fi
 
   opencode_bin="${OPENCODE_BIN:-${OPENCODE_BIN_DEFAULT}}"
-  resume_agent="${GAETA_RESUME_AGENT:-orchestrator}"
+  resume_agent="${GAETA_RESUME_AGENT:-plan}"
 
   if [[ -z "${resume_agent}" ]]; then
-    resume_agent="orchestrator"
+    resume_agent="plan"
   fi
 
   if [[ "${show_only}" -eq 1 ]]; then
@@ -3019,10 +3034,10 @@ if [[ "${1:-}" == "tasks" ]]; then
   exit 0
 fi
 
-# Command dispatch: gaeta handoff ...
-if [[ "${1:-}" == "handoff" ]]; then
+# Command dispatch: gaeta pause ...
+if [[ "${1:-}" == "pause" ]]; then
   shift
-  if ! run_handoff_command "$@"; then
+  if ! run_pause_command "$@"; then
     exit 1
   fi
   exit 0

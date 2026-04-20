@@ -45,27 +45,7 @@ JSON
 cat >"${TEST_HOME}/.config/gaeta/opencode.json" <<'JSON'
 {
   "agent": {
-    "discovery": {
-      "permission": {
-        "edit": "deny"
-      }
-    },
-    "orchestrator": {
-      "permission": {
-        "edit": "deny"
-      }
-    },
-    "reviewer": {
-      "permission": {
-        "edit": "deny"
-      }
-    },
-    "qa": {
-      "permission": {
-        "edit": "deny"
-      }
-    },
-    "evolution": {
+    "review": {
       "permission": {
         "edit": "deny"
       }
@@ -192,7 +172,7 @@ assert projected_config["nested"]["from_base"] is True, projected_config
 assert projected_config["nested"]["overridden"] == "gaeta", projected_config
 assert "plan" in projected_config["agent"], projected_config
 assert "build" in projected_config["agent"], projected_config
-assert projected_config["agent"]["discovery"]["permission"]["edit"] == "deny", projected_config
+assert projected_config["agent"]["review"]["permission"]["edit"] == "deny", projected_config
 
 assert projected_tui["theme"] == "gaeta", projected_tui
 assert projected_tui["keybinds"]["open"] == "ctrl+o", projected_tui
@@ -243,14 +223,27 @@ PY
 
 HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$UNINIT_PROJECT" >/dev/null
 
+cat >"${TEST_PROJECT}/docs/.gaeta/handoff.md" <<'MD'
+# Handoff
+
+## Project update
+
+- LEGACY-HANDOFF-SENTINEL
+MD
+
+LEGACY_RESUME_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$TEST_PROJECT")"
+[[ "$LEGACY_RESUME_OUTPUT" != *"LEGACY-HANDOFF-SENTINEL"* ]]
+[[ "$LEGACY_RESUME_OUTPUT" == *"continue from resume helper output"* ]]
+
 HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
-HOME="$TEST_HOME" "$GAETA_BIN" handoff "$TEST_PROJECT"
+HOME="$TEST_HOME" "$GAETA_BIN" pause "$TEST_PROJECT"
 proposal_one="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Build a terminal todo list MVP")"
 HOME="$TEST_HOME" "$GAETA_BIN" proposal approve "$TEST_PROJECT" latest >/dev/null
 proposal_two="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Implement a ping-pong score tracker")"
 HOME="$TEST_HOME" "$GAETA_BIN" proposal reject "$TEST_PROJECT" latest "Need tighter validation" >/dev/null
 
 python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" <<'PY'
+import json
 import pathlib
 import sys
 
@@ -259,7 +252,7 @@ proposal_one = pathlib.Path(sys.argv[2])
 proposal_two = pathlib.Path(sys.argv[3])
 repo_root = pathlib.Path(sys.argv[4])
 status_text = (project / "docs" / ".gaeta" / "status.md").read_text(encoding="utf-8")
-handoff_text = (project / "docs" / ".gaeta" / "handoff.md").read_text(encoding="utf-8")
+pause_text = (project / "docs" / ".gaeta" / "pause.md").read_text(encoding="utf-8")
 project_text = (project / "PROJECT.md").read_text(encoding="utf-8")
 session_log = (project / ".gaeta" / "session.log").read_text(encoding="utf-8")
 proposal_one_text = proposal_one.read_text(encoding="utf-8")
@@ -268,10 +261,10 @@ proposal_two_text = proposal_two.read_text(encoding="utf-8")
 assert "## In progress" in status_text, status_text
 assert "Implement sync behavior." in status_text, status_text
 assert "Add methodology-enforced instructions." in status_text, status_text
-assert "# Handoff" in handoff_text, handoff_text
-assert "Phase X" in handoff_text, handoff_text
+assert "# Pause" in pause_text, pause_text
+assert "Phase X" in pause_text, pause_text
 assert "## Next Step" in project_text, project_text
-assert "handoff: synced status and wrote docs/.gaeta/handoff.md" in session_log, session_log
+assert "pause: synced status and wrote docs/.gaeta/pause.md" in session_log, session_log
 
 assert "- Status: approved" in proposal_one_text, proposal_one_text
 assert "approved via gaeta proposal approve" in proposal_one_text, proposal_one_text
@@ -281,49 +274,28 @@ assert "Need tighter validation" in proposal_two_text, proposal_two_text
 commands_dir = repo_root / ".opencode" / "commands"
 agents_dir = repo_root / ".opencode" / "agents"
 expected = {
-    "handoff.md": "agent: orchestrator",
-    "check.md": "agent: reviewer",
-    "review.md": "agent: reviewer",
-    "doctor.md": "agent: qa",
-    "qa.md": "agent: qa",
-    "propose.md": "agent: evolution",
-    "approve.md": "agent: evolution",
-    "reject.md": "agent: evolution",
-    "resume.md": "agent: orchestrator",
+    "pause.md": "agent: build",
+    "review.md": "agent: review",
+    "evolve.md": "agent: plan",
+    "resume.md": "agent: plan",
 }
 for name, marker in expected.items():
     text = (commands_dir / name).read_text(encoding="utf-8")
     assert marker in text, (name, marker)
 
 config = json.loads((repo_root / "opencode.json").read_text(encoding="utf-8"))
-for agent_name in [
-    "discovery",
-    "orchestrator",
-    "plan",
-    "build",
-    "reviewer",
-    "qa",
-    "evolution",
-]:
+for agent_name in ["plan", "build", "review"]:
     assert agent_name in config["agent"], agent_name
-for removed in ["architect", "implementer", "handoff-writer"]:
+for removed in ["discovery", "orchestrator", "reviewer", "qa", "evolution", "architect", "implementer", "handoff-writer"]:
     assert removed not in config["agent"], removed
 
-assert config["agent"]["orchestrator"]["permission"]["bash"]["git status *"] == "allow", config
 assert config["agent"]["plan"]["permission"]["bash"]["git status *"] == "allow", config
+assert config["agent"]["build"]["permission"]["bash"]["git*"] == "deny", config
 
-for agent_name in [
-    "discovery",
-    "orchestrator",
-    "plan",
-    "build",
-    "reviewer",
-    "qa",
-    "evolution",
-]:
+for agent_name in ["plan", "build", "review"]:
     path = agents_dir / f"{agent_name}.md"
     assert path.exists(), path
     assert path.read_text(encoding="utf-8").strip(), path
 
-print("tasks sync and handoff tests passed")
+print("tasks sync and pause tests passed")
 PY

@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: build lint test
+.PHONY: build lint test legacy-clean
 
 SHELL_SOURCES := gaeta scripts/test-doctor.sh
 SHELLHARDEN_SOURCES := scripts/test-doctor.sh tests/doctor.bats
@@ -15,6 +15,7 @@ build:
 	@printf "$(BLUE)==> Installing gaeta config bundle$(NC)\n"
 	@mkdir -p "$(GAETA_CONFIG_HOME)/commands"
 	@mkdir -p "$(GAETA_CONFIG_HOME)/agents"
+	@$(MAKE) legacy-clean >/dev/null
 	@install -m 0644 opencode.json "$(GAETA_CONFIG_HOME)/opencode.json"
 	@install -m 0644 .opencode/commands/*.md "$(GAETA_CONFIG_HOME)/commands/"
 	@install -m 0644 .opencode/agents/*.md "$(GAETA_CONFIG_HOME)/agents/"
@@ -25,6 +26,22 @@ build:
 		printf "$(YELLOW)[SKIP] tui.json not found$(NC)\n"; \
 	fi
 	@printf "$(GREEN)[OK] installed opencode.json + command/agent templates to $(GAETA_CONFIG_HOME)$(NC)\n"
+
+legacy-clean:
+	@printf "$(BLUE)==> Removing legacy gaeta templates$(NC)\n"
+	@rm -f "$(GAETA_CONFIG_HOME)/commands/handoff.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/commands/check.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/commands/doctor.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/commands/qa.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/commands/propose.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/commands/approve.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/commands/reject.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/agents/discovery.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/agents/orchestrator.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/agents/reviewer.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/agents/qa.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/agents/evolution.md"
+	@printf "$(GREEN)[OK] legacy templates cleaned from $(GAETA_CONFIG_HOME)$(NC)\n"
 
 lint:
 	@printf "$(BLUE)==> Running lint checks$(NC)\n"
