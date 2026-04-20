@@ -2,7 +2,7 @@
 
 - [x] Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
 - [x] Add projection safety matrix for symlink vs mirror decisions.
-- [ ] Add Linux/macOS portability notes.
+- [x] Add Linux/macOS portability notes.
 - [x] Make `/go` keep validation commands visible to agents but hidden from user-facing chat output.
 - [ ] Add threat model document.
 - [ ] Add fixture repository layout.

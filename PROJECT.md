@@ -22,10 +22,11 @@
 - Hard-save backups are now available via `gaeta backup [PROJECT_DIR]` under `docs/.gaeta/backups/` with a manifest documenting explicit runtime exclusions.
 - Config projection examples are documented in both `docs/config-sample.md` and `docs/architecture.md`.
 - Projection safety policy is now documented as `mirror-only` in `docs/architecture.md`.
+- Linux/macOS portability notes are documented in `docs/architecture.md`.
 
 ## Next Step
 
-Add Linux/macOS portability notes.
+Add threat model document.
 
 ## Resume Prompt
 

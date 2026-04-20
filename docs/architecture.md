@@ -501,6 +501,30 @@ intentionally disabled to keep behavior deterministic and sandbox-safe.
 | `.gaeta/projection/projection.json` | mirror-only | explicit runtime manifest for debugging and doctor validation | on mismatch, regenerate projection and fail doctor until consistent |
 | `.gaeta/projection/*` bind targets | mirror-only | concrete repo-local bind paths are reproducible across sessions | if files are stale, refresh projection before launch; never bind symlinks |
 
+### Linux/macOS portability notes
+
+gaeta targets Linux-first sandbox behavior and degrades safely when Linux-only
+primitives are unavailable.
+
+| Capability | Linux | macOS | Operator guidance |
+| ---------- | ----- | ----- | ----------------- |
+| Wrapper launch (`gaeta`) | supported | supported | core wrapper and workflow commands are expected to run on both platforms |
+| Bubblewrap isolation (`bwrap`) | supported | not supported | macOS runs without bubblewrap parity; treat host execution as reduced isolation |
+| Landlock via `landrun` | optional defense-in-depth | not available | Landlock checks are Linux-specific and should be treated as unavailable on macOS |
+| Projection/mirror artifacts (`.gaeta/projection/*`) | supported | supported | mirror-only projection policy is cross-platform and remains deterministic |
+| `gaeta doctor` sandbox runtime check | partial in constrained namespaces (`bwrap` ENOSPC possible) | limited by missing `bwrap`/Landlock | use `GAETA_DOCTOR_SKIP_SANDBOX=1` when environment cannot run nested sandbox checks |
+
+Recommended verification commands:
+
+- Linux: `make lint && make test`, `./gaeta status .`, `./gaeta doctor --verbose .`
+- macOS: `make lint && make test`, `./gaeta status .`, `GAETA_DOCTOR_SKIP_SANDBOX=1 ./gaeta doctor --verbose .`
+
+Known constraints:
+
+- Namespace-constrained Linux environments may fail nested `bwrap` checks with `ENOSPC`.
+- macOS does not provide Linux namespace/Landlock primitives; sandbox validation is
+  intentionally partial there.
+
 ## Security Model
 
 ### Isolation Layers

@@ -75,10 +75,11 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Added a projection safety matrix to `docs/architecture.md` and locked gaeta projection policy to mirror-only for deterministic sandbox-safe binds.
 - Added rotating `gaeta go` kickoff flow and wired `/go` (`agent: plan`) to rotate `plan -> build -> review` per invocation.
 - Updated `gaeta go` with output formats (`user`/`agent`), commit-aware reset to `plan` on git HEAD changes, and cycle-state self-healing with runtime logs.
+- Added Linux/macOS portability notes in `docs/architecture.md` with per-platform capability guidance, verification commands, and known sandbox constraints.
 
 ## In progress
 
-- Add Linux/macOS portability notes.
+- Add threat model document.
 
 ## Blockers
 
@@ -86,7 +87,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Add Linux/macOS portability notes.
+Add threat model document.
 
 ## Decisions
 
@@ -128,3 +129,4 @@ Add Linux/macOS portability notes.
 - Projection policy is now explicitly mirror-only for config and directory artifacts; symlink projection is intentionally not used.
 - Operator slash command surface now includes `/go`, backed by a rotating `plan -> build -> review` kickoff cycle.
 - `/go` default user output intentionally omits validation command lists; `--format agent` keeps validation commands visible for agent execution.
+- Portability policy is now explicit: Linux-first sandbox guarantees, macOS partial sandbox validation with documented fallback expectations.
