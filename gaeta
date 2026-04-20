@@ -29,6 +29,7 @@ Usage:
   gaeta init [--force] [PROJECT_DIR]
   gaeta doctor [PROJECT_DIR]
   gaeta status [PROJECT_DIR]
+  gaeta go [--show] [--format user|agent] [PROJECT_DIR]
   gaeta backup [PROJECT_DIR]
   gaeta resume [--show] [PROJECT_DIR]
   gaeta r [--show] [PROJECT_DIR]
@@ -41,6 +42,7 @@ Options:
   init                  Initialize gaeta workflow files in a project
   doctor                 Run gaeta self-inspection checks
   status                 Show phase, next step, pending sprint items, blockers
+  go                     Rotate plan/build/review kickoff bundle
   backup                 Write a hard-save backup of workflow files
   resume, r              Show phase/next-step resume context
   pause                  Sync workflow docs and write pause snapshot
@@ -139,6 +141,9 @@ Examples:
   gaeta doctor ../repo     # inspect another project
   gaeta status             # show current phase/next/pending/blockers
   gaeta status ../repo     # show status for another project
+  gaeta go                 # rotate kickoff role (plan->build->review)
+  gaeta go --show          # show kickoff bundle in user format
+  gaeta go --show --format agent # include validation commands for agent workflows
   gaeta backup             # write hard-save backup under docs/.gaeta/backups
   gaeta backup ../repo     # write backup for another project
   gaeta resume             # launch opencode with resume prompt
@@ -1671,6 +1676,312 @@ for row in blocker_rows[:5]:
 PY
     error "failed to render status"
     return 1
+  fi
+
+  return 0
+}
+
+run_go_command() {
+  local target_project="${PWD}"
+  local show_mode=0
+  local output_format="user"
+  local -a go_positionals=()
+
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'GO_HELP'
+Usage:
+  gaeta go [--show] [--format user|agent] [PROJECT_DIR]
+
+Provides a concise kickoff bundle and rotates role selection in this order:
+  - plan -> build -> review -> plan
+
+Output formats:
+  user   concise kickoff bundle for user-facing chat (default)
+  agent  includes validation commands for agent execution
+GO_HELP
+    return 0
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --show)
+        show_mode=1
+        ;;
+      --format)
+        if [[ $# -lt 2 ]]; then
+          error "go --format requires one value: user or agent"
+          return 1
+        fi
+        case "$2" in
+          user | agent)
+            output_format="$2"
+            ;;
+          *)
+            error "go --format must be one of: user, agent"
+            return 1
+            ;;
+        esac
+        shift
+        ;;
+      --format=*)
+        case "${1#--format=}" in
+          user | agent)
+            output_format="${1#--format=}"
+            ;;
+          *)
+            error "go --format must be one of: user, agent"
+            return 1
+            ;;
+        esac
+        ;;
+      -*)
+        error "unknown go option: $1"
+        return 1
+        ;;
+      *)
+        go_positionals+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  if [[ ${#go_positionals[@]} -gt 1 ]]; then
+    error "go accepts at most one optional PROJECT_DIR"
+    return 1
+  fi
+
+  if [[ ${#go_positionals[@]} -eq 1 ]]; then
+    target_project="${go_positionals[0]}"
+  fi
+
+  if [[ ! -d "${target_project}" ]]; then
+    error "go project directory does not exist: ${target_project}"
+    return 1
+  fi
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    error "python3 is required for go command"
+    return 1
+  fi
+
+  target_project="$(realpath "${target_project}")"
+  if ! require_project_initialized "${target_project}" "go"; then
+    return 1
+  fi
+
+  local status_file="${target_project}/docs/.gaeta/status.md"
+  local checklist_file="${target_project}/docs/.gaeta/checklist.md"
+  local cycle_file="${target_project}/.gaeta/go-cycle.json"
+  local runtime_log="${target_project}/.gaeta/session.log"
+
+  if ! python3 - "${target_project}" "${status_file}" "${checklist_file}" "${cycle_file}" "${runtime_log}" "${output_format}" <<'PY'; then
+import datetime
+import json
+import pathlib
+import re
+import subprocess
+import sys
+
+
+def section_body(text: str, heading: str) -> str:
+    pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.MULTILINE)
+    match = pattern.search(text)
+    if not match:
+        return ""
+    start = match.end()
+    remaining = text[start:]
+    next_heading = re.search(r"^##\s+", remaining, re.MULTILINE)
+    if next_heading:
+        return remaining[: next_heading.start()].strip()
+    return remaining.strip()
+
+
+def one_line(text: str, fallback: str) -> str:
+    parts = [line.strip() for line in text.splitlines() if line.strip()]
+    return " ".join(parts) if parts else fallback
+
+
+def normalize_bullets(text: str, fallback: str) -> list[str]:
+    rows: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("- "):
+            rows.append(line)
+        else:
+            rows.append(f"- {line}")
+    return rows or [fallback]
+
+
+project = pathlib.Path(sys.argv[1])
+status_path = pathlib.Path(sys.argv[2])
+checklist_path = pathlib.Path(sys.argv[3])
+cycle_path = pathlib.Path(sys.argv[4])
+runtime_log_path = pathlib.Path(sys.argv[5])
+output_format = sys.argv[6]
+
+
+def append_runtime_log(message: str) -> None:
+    runtime_log_path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    with runtime_log_path.open("a", encoding="utf-8") as fh:
+        fh.write(f"[{timestamp}] {message}\n")
+
+
+def git_head(path: pathlib.Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    except Exception:
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+status_text = status_path.read_text(encoding="utf-8")
+checklist_text = checklist_path.read_text(encoding="utf-8")
+
+phase_value = one_line(section_body(status_text, "Current phase"), "unknown")
+next_step_value = one_line(section_body(status_text, "Next step"), "(not defined)")
+blocker_rows = normalize_bullets(section_body(status_text, "Blockers"), "- none")
+
+pending_sprint: list[str] = []
+in_current_sprint = False
+for raw in checklist_text.splitlines():
+    line = raw.strip()
+    if line.startswith("## "):
+        in_current_sprint = line == "## Current Sprint"
+        continue
+    if in_current_sprint and line.startswith("- [ ] "):
+        pending_sprint.append(line[6:].strip())
+
+order = ["plan", "build", "review"]
+selected_role = "plan"
+recovered_cycle = False
+head_reset = False
+stored_head = ""
+current_head = git_head(project)
+
+if cycle_path.exists():
+    try:
+        payload = json.loads(cycle_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            payload = {}
+            recovered_cycle = True
+    except Exception:
+        payload = {}
+        recovered_cycle = True
+
+    schema = payload.get("schema_version")
+    if schema not in (None, 1):
+        payload = {}
+        recovered_cycle = True
+
+    stored_head = payload.get("last_head") or ""
+    if current_head and stored_head and current_head != stored_head:
+        selected_role = "plan"
+        head_reset = True
+    else:
+        candidate = payload.get("next_agent")
+        if candidate in order:
+            selected_role = candidate
+        else:
+            previous = payload.get("last_agent")
+            if previous in order:
+                selected_role = order[(order.index(previous) + 1) % len(order)]
+            elif payload:
+                recovered_cycle = True
+
+next_role = order[(order.index(selected_role) + 1) % len(order)]
+
+cycle_path.parent.mkdir(parents=True, exist_ok=True)
+temp_cycle_path = cycle_path.with_suffix(cycle_path.suffix + ".tmp")
+temp_cycle_path.write_text(
+    json.dumps(
+        {
+            "schema_version": 1,
+            "updated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+            "last_agent": selected_role,
+            "next_agent": next_role,
+            "order": order,
+            "last_head": current_head,
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+temp_cycle_path.replace(cycle_path)
+
+if recovered_cycle:
+    append_runtime_log("go: recovered cycle state to safe defaults")
+if head_reset:
+    append_runtime_log("go: reset rotation to plan after git HEAD change")
+
+role_slice = {
+    "plan": "Define the smallest approved slice for the current next step with explicit goals and acceptance criteria before editing files.",
+    "build": "Implement the top pending sprint item with minimal deterministic edits, then sync checklist/status to match delivered behavior.",
+    "review": "Run review checks on the current diff, highlight highest-risk changes, and provide a suggested Conventional Commit message.",
+}
+
+role_validation = {
+    "plan": [
+        "make lint && make test",
+        "./gaeta status .",
+    ],
+    "build": [
+        "make lint && make test",
+        "./gaeta status .",
+        "./gaeta doctor --verbose .",
+    ],
+    "review": [
+        "git status",
+        "git diff",
+        "git diff --staged",
+        "sem (if available)",
+    ],
+}
+
+print("gaeta go")
+print(f"  project: {project}")
+print(f"  phase: {phase_value}")
+print(f"  next step: {next_step_value}")
+print(f"  selected role: {selected_role}")
+print("  top pending sprint items:")
+if pending_sprint:
+    for item in pending_sprint[:5]:
+        print(f"    - {item}")
+else:
+    print("    - none")
+
+print("  blockers:")
+for row in blocker_rows[:5]:
+    print(f"    {row}")
+
+print(f"  first implementation slice: {role_slice[selected_role]}")
+if output_format == "agent":
+    print("  validation commands before /review:")
+    for cmd in role_validation[selected_role]:
+        print(f"    - {cmd}")
+print(f"  next role in cycle: {next_role}")
+if head_reset:
+    print("  rotation note: reset to plan because git HEAD changed.")
+PY
+    error "failed to render go bundle"
+    return 1
+  fi
+
+  mkdir -p "$(dirname "${runtime_log}")"
+  if [[ "${show_mode}" -eq 1 ]]; then
+    printf '[%s] go: rendered kickoff bundle (show mode)\n' "$(date -Iseconds)" >>"${runtime_log}"
+  else
+    printf '[%s] go: rendered kickoff bundle\n' "$(date -Iseconds)" >>"${runtime_log}"
   fi
 
   return 0
@@ -3289,6 +3600,15 @@ fi
 if [[ "${1:-}" == "status" ]]; then
   shift
   if ! run_status_command "$@"; then
+    exit 1
+  fi
+  exit 0
+fi
+
+# Command dispatch: gaeta go ...
+if [[ "${1:-}" == "go" ]]; then
+  shift
+  if ! run_go_command "$@"; then
     exit 1
   fi
   exit 0

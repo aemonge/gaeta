@@ -47,7 +47,7 @@ At session end:
 - Session resume: `/resume`.
 - Session snapshot: `/status`.
 - Session checkpoint: `/pause`.
-- Start next build slice: `/go`.
+- Start the next rotated slice (`plan -> build -> review`): `/go`.
 - Implementation review and validation: `/review`.
 - Agent/workflow evolution: `/evolve`.
 

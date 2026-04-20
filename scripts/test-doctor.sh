@@ -241,6 +241,29 @@ LEGACY_RESUME_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$TEST_PROJ
 
 HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
 STATUS_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" status "$TEST_PROJECT")"
+GO_ONE_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
+GO_TWO_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
+GO_THREE_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
+GO_SHOW_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go --show "$TEST_PROJECT")"
+GO_AGENT_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go --show --format agent "$TEST_PROJECT")"
+
+mkdir -p "$TEST_PROJECT/.gaeta"
+cat >"$TEST_PROJECT/.gaeta/go-cycle.json" <<'JSON'
+not-json
+JSON
+GO_RECOVER_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
+
+git -C "$TEST_PROJECT" init >/dev/null
+git -C "$TEST_PROJECT" add .
+git -C "$TEST_PROJECT" -c user.name=gaeta -c user.email=gaeta@example.com commit -m "init" >/dev/null
+GO_POST_INIT_ONE="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
+GO_POST_INIT_TWO="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
+cat >"$TEST_PROJECT/docs/.gaeta/head-reset-note.md" <<'MD'
+head reset trigger
+MD
+git -C "$TEST_PROJECT" add .
+git -C "$TEST_PROJECT" -c user.name=gaeta -c user.email=gaeta@example.com commit -m "advance" >/dev/null
+GO_HEAD_RESET_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
 HOME="$TEST_HOME" "$GAETA_BIN" pause "$TEST_PROJECT"
 BACKUP_PATH="$(HOME="$TEST_HOME" "$GAETA_BIN" backup "$TEST_PROJECT")"
 proposal_one="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Build a terminal todo list MVP")"
@@ -258,7 +281,7 @@ set -e
 [[ "$UNINIT_BACKUP_OUTPUT" == *"requires an initialized gaeta project"* ]]
 [[ "$UNINIT_BACKUP_OUTPUT" == *"gaeta init"* ]]
 
-python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" "$STATUS_OUTPUT" "$BACKUP_PATH" <<'PY'
+python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" "$STATUS_OUTPUT" "$BACKUP_PATH" "$GO_ONE_OUTPUT" "$GO_TWO_OUTPUT" "$GO_THREE_OUTPUT" "$GO_SHOW_OUTPUT" "$GO_AGENT_OUTPUT" "$GO_RECOVER_OUTPUT" "$GO_POST_INIT_ONE" "$GO_POST_INIT_TWO" "$GO_HEAD_RESET_OUTPUT" <<'PY'
 import json
 import pathlib
 import sys
@@ -269,6 +292,15 @@ proposal_two = pathlib.Path(sys.argv[3])
 repo_root = pathlib.Path(sys.argv[4])
 status_output = sys.argv[5]
 backup_dir = pathlib.Path(sys.argv[6])
+go_one_output = sys.argv[7]
+go_two_output = sys.argv[8]
+go_three_output = sys.argv[9]
+go_show_output = sys.argv[10]
+go_agent_output = sys.argv[11]
+go_recover_output = sys.argv[12]
+go_post_init_one = sys.argv[13]
+go_post_init_two = sys.argv[14]
+go_head_reset_output = sys.argv[15]
 status_text = (project / "docs" / ".gaeta" / "status.md").read_text(encoding="utf-8")
 pause_text = (project / "docs" / ".gaeta" / "pause.md").read_text(encoding="utf-8")
 project_text = (project / "PROJECT.md").read_text(encoding="utf-8")
@@ -285,6 +317,28 @@ assert "phase: Phase X" in status_output, status_output
 assert "next step: Implement sync behavior." in status_output, status_output
 assert "blockers:" in status_output, status_output
 assert "- none" in status_output, status_output
+assert "selected role: plan" in go_one_output, go_one_output
+assert "next role in cycle: build" in go_one_output, go_one_output
+assert "selected role: build" in go_two_output, go_two_output
+assert "next role in cycle: review" in go_two_output, go_two_output
+assert "selected role: review" in go_three_output, go_three_output
+assert "next role in cycle: plan" in go_three_output, go_three_output
+assert "gaeta go" in go_show_output, go_show_output
+assert "selected role:" in go_show_output, go_show_output
+assert "validation commands before /review:" not in go_show_output, go_show_output
+assert "validation commands before /review:" in go_agent_output, go_agent_output
+assert "make lint && make test" in go_agent_output, go_agent_output
+assert "selected role: plan" in go_recover_output, go_recover_output
+assert "selected role: build" in go_post_init_one, go_post_init_one
+assert "selected role: review" in go_post_init_two, go_post_init_two
+assert "selected role: plan" in go_head_reset_output, go_head_reset_output
+assert "rotation note: reset to plan because git HEAD changed." in go_head_reset_output, go_head_reset_output
+
+cycle_payload = json.loads((project / ".gaeta" / "go-cycle.json").read_text(encoding="utf-8"))
+assert cycle_payload["schema_version"] == 1, cycle_payload
+assert "last_head" in cycle_payload, cycle_payload
+assert "go: recovered cycle state to safe defaults" in session_log, session_log
+assert "go: reset rotation to plan after git HEAD change" in session_log, session_log
 assert "# Pause" in pause_text, pause_text
 assert "Phase X" in pause_text, pause_text
 assert "## Next Step" in project_text, project_text
@@ -316,7 +370,7 @@ commands_dir = repo_root / ".opencode" / "commands"
 agents_dir = repo_root / ".opencode" / "agents"
 expected = {
     "pause.md": "agent: build",
-    "go.md": "agent: build",
+    "go.md": "agent: plan",
     "review.md": "agent: review",
     "evolve.md": "agent: plan",
     "resume.md": "agent: plan",

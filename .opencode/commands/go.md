@@ -1,6 +1,6 @@
 ---
-description: Start the next slice in build mode
-agent: build
+description: Start the next slice with rotated kickoff role
+agent: plan
 ---
 Resolve gaeta launcher in this order:
 1. `./gaeta` when present in current project root.
@@ -8,16 +8,8 @@ Resolve gaeta launcher in this order:
 
 If neither launcher exists, stop and report: `gaeta not found` (recommended fix: run `make build` in gaeta repo and ensure `gaeta` is in PATH).
 
-Run `<gaeta-launcher> status .`.
+Run `<gaeta-launcher> go --show --format user .`.
 
-If output indicates project is not initialized, run `<gaeta-launcher> init .` first.
+If output indicates project is not initialized, run `<gaeta-launcher> init .` first, then rerun `<gaeta-launcher> go --show --format user .`.
 
-Then reply with a concise go bundle for immediate build execution:
-- current phase,
-- next step,
-- top pending sprint items,
-- blockers,
-- exact first implementation slice,
-- validation commands to run before `/review`.
-
-Keep the response action-oriented and implementation-ready.
+Reply with the command output as the kickoff bundle.

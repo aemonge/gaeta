@@ -289,6 +289,91 @@ PY
   [[ "$output" == *"- none"* ]]
 }
 
+@test "go rotates plan build review cycle" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"selected role: plan"* ]]
+  [[ "$output" == *"next role in cycle: build"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"selected role: build"* ]]
+  [[ "$output" == *"next role in cycle: review"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"selected role: review"* ]]
+  [[ "$output" == *"next role in cycle: plan"* ]]
+}
+
+@test "go supports show mode" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" go --show "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gaeta go"* ]]
+  [[ "$output" == *"selected role:"* ]]
+  [[ "$output" != *"validation commands before /review:"* ]]
+}
+
+@test "go agent format includes validation commands" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" go --show --format agent "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"validation commands before /review:"* ]]
+  [[ "$output" == *"make lint && make test"* ]]
+}
+
+@test "go recovers from corrupted cycle state and resets on git head change" {
+  mkdir -p "$TEST_PROJECT/.gaeta"
+  cat >"$TEST_PROJECT/.gaeta/go-cycle.json" <<'JSON'
+not-json
+JSON
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"selected role: plan"* ]]
+
+  run python3 - "$TEST_PROJECT/.gaeta/go-cycle.json" "$TEST_PROJECT/.gaeta/session.log" <<'PY'
+import json
+import pathlib
+import sys
+
+cycle = pathlib.Path(sys.argv[1])
+session_log = pathlib.Path(sys.argv[2])
+payload = json.loads(cycle.read_text(encoding="utf-8"))
+assert payload["schema_version"] == 1, payload
+assert payload["last_agent"] == "plan", payload
+assert "go: recovered cycle state to safe defaults" in session_log.read_text(encoding="utf-8")
+PY
+  [ "$status" -eq 0 ]
+
+  run git -C "$TEST_PROJECT" init
+  [ "$status" -eq 0 ]
+  run git -C "$TEST_PROJECT" add .
+  [ "$status" -eq 0 ]
+  run git -C "$TEST_PROJECT" -c user.name=gaeta -c user.email=gaeta@example.com commit -m "init"
+  [ "$status" -eq 0 ]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"selected role: build"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"selected role: review"* ]]
+
+  cat >"$TEST_PROJECT/docs/.gaeta/head-reset-note.md" <<'MD'
+head reset trigger
+MD
+  run git -C "$TEST_PROJECT" add .
+  [ "$status" -eq 0 ]
+  run git -C "$TEST_PROJECT" -c user.name=gaeta -c user.email=gaeta@example.com commit -m "advance"
+  [ "$status" -eq 0 ]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"selected role: plan"* ]]
+  [[ "$output" == *"rotation note: reset to plan because git HEAD changed."* ]]
+}
+
 @test "resume prefers docs/.gaeta/pause.md context when present" {
   cat >"${TEST_PROJECT}/docs/.gaeta/pause.md" <<'MD'
 # Pause
@@ -525,7 +610,7 @@ commands = repo / ".opencode" / "commands"
 agents_dir = repo / ".opencode" / "agents"
 expected = {
     "pause.md": "agent: build",
-    "go.md": "agent: build",
+    "go.md": "agent: plan",
     "review.md": "agent: review",
     "evolve.md": "agent: plan",
     "resume.md": "agent: plan",

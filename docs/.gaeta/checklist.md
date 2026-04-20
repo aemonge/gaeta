@@ -31,7 +31,8 @@
 - [x] Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
 - [x] Add projection safety matrix for symlink vs mirror decisions.
 - [ ] Add Linux/macOS portability notes.
-- [x] Add `/go` slash command to kick off the next implementation slice in build mode.
+- [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
+- [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.
 - [x] Add OpenCode slash-command pack: `/check`, `/doctor`, `/propose`, `/approve`, `/reject`, `/resume`.
 - [x] Add additional OpenCode agent profiles beyond `plan`/`build` for orchestration and review flows.
 - [x] Reuse `plan` and `build` as core agent roles (`plan`=architecture, `build`=implementation).
