@@ -336,6 +336,8 @@ assert ".gaeta/projection/opencode.json" in config_sample, config_sample
 
 architecture_text = (repo_root / "docs" / "architecture.md").read_text(encoding="utf-8")
 assert "docs/config-sample.md" in architecture_text, architecture_text
+assert "Projection safety matrix (gaeta policy)" in architecture_text, architecture_text
+assert "mirror-only" in architecture_text, architecture_text
 
 config = json.loads((repo_root / "opencode.json").read_text(encoding="utf-8"))
 for agent_name in ["plan", "build", "review"]:

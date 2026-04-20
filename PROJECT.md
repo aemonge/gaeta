@@ -19,10 +19,11 @@
 - OpenCode agent roster is now minimal and role-aligned: `plan`, `build`, `review`.
 - Hard-save backups are now available via `gaeta backup [PROJECT_DIR]` under `docs/.gaeta/backups/` with a manifest documenting explicit runtime exclusions.
 - Config projection examples are documented in both `docs/config-sample.md` and `docs/architecture.md`.
+- Projection safety policy is now documented as `mirror-only` in `docs/architecture.md`.
 
 ## Next Step
 
-Add projection safety matrix for symlink vs mirror decisions.
+Add Linux/macOS portability notes.
 
 ## Resume Prompt
 

@@ -72,10 +72,11 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Updated `/review` command contract so successful reviews proactively include a Conventional Commit suggestion.
 - Improved `gaeta backup` UX output with human-readable stderr guidance while keeping stdout as the absolute backup directory path for scripting.
 - Added config projection examples in both `docs/config-sample.md` and `docs/architecture.md`, with test assertions to keep both references in sync.
+- Added a projection safety matrix to `docs/architecture.md` and locked gaeta projection policy to mirror-only for deterministic sandbox-safe binds.
 
 ## In progress
 
-- Add projection safety matrix for symlink vs mirror decisions.
+- Add Linux/macOS portability notes.
 
 ## Blockers
 
@@ -83,7 +84,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Add projection safety matrix for symlink vs mirror decisions.
+Add Linux/macOS portability notes.
 
 ## Decisions
 
@@ -122,3 +123,4 @@ Add projection safety matrix for symlink vs mirror decisions.
 - Backup output/manifest wording must stay project-relative and must not assume direct host-home visibility under bubblewrap.
 - Successful `/review` runs should include a single `Suggested commit:` Conventional Commit line when no blocking issues are found.
 - Config projection behavior is now documented twice by design: quick reference in `docs/config-sample.md` and architecture pointer in `docs/architecture.md`.
+- Projection policy is now explicitly mirror-only for config and directory artifacts; symlink projection is intentionally not used.

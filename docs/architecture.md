@@ -485,6 +485,22 @@ For a concrete `~/.config/opencode/opencode.json` + `~/.config/gaeta/opencode.js
 example and the expected `.gaeta/projection/opencode.json` output, see
 `docs/config-sample.md`.
 
+### Projection safety matrix (gaeta policy)
+
+gaeta policy is `mirror-only` for projection artifacts. Direct symlink projection is
+intentionally disabled to keep behavior deterministic and sandbox-safe.
+
+| Artifact | Mode | Why | Risk / fallback |
+| -------- | ---- | --- | --------------- |
+| `opencode.json` | mirror-only | deterministic merged file; stable bind target under `.gaeta/projection/` | if merge fails, doctor should fail and surface the projection error; no symlink fallback |
+| `tui.json` | mirror-only | same projection semantics as `opencode.json`; prevents host-path drift | if source missing, projection omits file and OpenCode uses defaults |
+| `agents/` | mirror-only | merged directory view with gaeta precedence; avoids host symlink exposure | if projection fails, launch should stop before sandbox execution |
+| `commands/` | mirror-only | stable slash-command surface and deterministic role bindings | if projection fails, doctor/launch should fail with explicit path checks |
+| `modes/` | mirror-only | predictable mode visibility with no host-home assumptions | if neither source exists, directory can remain absent (mode=none) |
+| `plugins/` | mirror-only | same isolation and precedence guarantees as modes | if neither source exists, directory can remain absent (mode=none) |
+| `.gaeta/projection/projection.json` | mirror-only | explicit runtime manifest for debugging and doctor validation | on mismatch, regenerate projection and fail doctor until consistent |
+| `.gaeta/projection/*` bind targets | mirror-only | concrete repo-local bind paths are reproducible across sessions | if files are stale, refresh projection before launch; never bind symlinks |
+
 ## Security Model
 
 ### Isolation Layers

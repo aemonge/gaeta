@@ -29,7 +29,8 @@
 - [x] Make `/review` proactively suggest a Conventional Commit message when checks pass.
 - [x] Improve `gaeta backup` UX messaging while keeping stdout script-safe.
 - [x] Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
-- [ ] Add projection safety matrix for symlink vs mirror decisions.
+- [x] Add projection safety matrix for symlink vs mirror decisions.
+- [ ] Add Linux/macOS portability notes.
 - [x] Add OpenCode slash-command pack: `/check`, `/doctor`, `/propose`, `/approve`, `/reject`, `/resume`.
 - [x] Add additional OpenCode agent profiles beyond `plan`/`build` for orchestration and review flows.
 - [x] Reuse `plan` and `build` as core agent roles (`plan`=architecture, `build`=implementation).
