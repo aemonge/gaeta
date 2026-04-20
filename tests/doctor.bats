@@ -82,6 +82,10 @@ Phase X
 ## Next step
 
 Implement sync behavior.
+
+## Blockers
+
+- none
 MD
 
   cat >"${TEST_PROJECT}/docs/.gaeta/checklist.md" <<'MD'
@@ -272,6 +276,19 @@ PY
   [[ "$output" == *"gaeta resume"* ]]
 }
 
+@test "status shows phase next pending and blockers" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" status "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gaeta status"* ]]
+  [[ "$output" == *"phase: Phase X"* ]]
+  [[ "$output" == *"next step: Implement sync behavior."* ]]
+  [[ "$output" == *"top pending sprint items:"* ]]
+  [[ "$output" == *"- Implement sync behavior."* ]]
+  [[ "$output" == *"- Add methodology-enforced instructions."* ]]
+  [[ "$output" == *"blockers:"* ]]
+  [[ "$output" == *"- none"* ]]
+}
+
 @test "resume prefers docs/.gaeta/pause.md context when present" {
   cat >"${TEST_PROJECT}/docs/.gaeta/pause.md" <<'MD'
 # Pause
@@ -455,6 +472,7 @@ expected = {
     "review.md": "agent: review",
     "evolve.md": "agent: plan",
     "resume.md": "agent: plan",
+    "status.md": "agent: plan",
 }
 
 for name, marker in expected.items():

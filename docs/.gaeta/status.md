@@ -58,12 +58,15 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Agent permissions now use explicit allowlists with fallback `ask` for unknown commands; known workflow commands are allow/deny only.
 - `build` agent now denies `git*` to keep commit/push operations human-driven.
 - Agent roster is now hard-cut to `plan`, `build`, and `review`.
-- Slash command surface is now hard-cut to `/resume`, `/pause`, `/review`, and `/evolve`.
+- Slash command surface is now `/resume`, `/status`, `/pause`, `/review`, and `/evolve`.
 - `gaeta pause` now replaces `gaeta handoff` and writes `docs/.gaeta/pause.md` for resume continuity.
 - `gaeta resume` now uses `docs/.gaeta/pause.md` context only (no legacy `docs/.gaeta/handoff.md` fallback).
 - Added `make legacy-clean` to remove legacy command/agent templates from `~/.config/gaeta`; `make build` now runs it before installing current templates.
 - Fixed doctor sandbox probe argument forwarding so non-OpenCode binaries (for example `-b /bin/bash` in the nested doctor check) no longer receive injected `--agent`, removing `/bin/bash: --agent: invalid option` noise.
 - Normalized `tests/doctor.bats` with shellharden-compatible quoting/expansions so `make lint` no longer fails at the shellharden gate.
+- Added `gaeta status` plus OpenCode `/status` command to report current phase, next step, top pending sprint items, and blockers from `docs/.gaeta/*`.
+- Extended `make legacy-clean` to remove stale legacy agent templates (`architect.md`, `implementer.md`, `handoff-writer.md`) from `~/.config/gaeta/agents`.
+- Added a deferred backlog item to make command/agent prompt templates bubblewrap-aware about host-home path isolation.
 
 ## In progress
 
@@ -101,7 +104,7 @@ Run a full TUI permission walkthrough (`/resume` -> `plan` -> `build` -> `/revie
 - Updated root permission baseline to avoid build-agent deadlocks caused by overly narrow `external_directory`/`edit` patterns.
 - Keep `/pause` as the canonical pause/checkpoint slash command.
 - Approval-gated evolution remains file-first via `gaeta proposal` artifacts, exposed through `/evolve` UX.
-- Operator slash commands are now: `/resume`, `/pause`, `/review`, `/evolve`.
+- Operator slash commands are now: `/resume`, `/status`, `/pause`, `/review`, `/evolve`.
 - Agent roster is minimal: `plan`, `build`, `review`.
 - Bare `gaeta` sessions default to `plan` unless an explicit `--agent` is passed.
 - `gaeta resume` defaults to `plan`.

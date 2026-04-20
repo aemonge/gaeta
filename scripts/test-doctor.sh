@@ -94,6 +94,10 @@ Phase X
 ## Next step
 
 Implement sync behavior.
+
+## Blockers
+
+- none
 MD
 
 cat >"${TEST_PROJECT}/docs/.gaeta/checklist.md" <<'MD'
@@ -236,13 +240,14 @@ LEGACY_RESUME_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$TEST_PROJ
 [[ "$LEGACY_RESUME_OUTPUT" == *"continue from resume helper output"* ]]
 
 HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
+STATUS_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" status "$TEST_PROJECT")"
 HOME="$TEST_HOME" "$GAETA_BIN" pause "$TEST_PROJECT"
 proposal_one="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Build a terminal todo list MVP")"
 HOME="$TEST_HOME" "$GAETA_BIN" proposal approve "$TEST_PROJECT" latest >/dev/null
 proposal_two="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Implement a ping-pong score tracker")"
 HOME="$TEST_HOME" "$GAETA_BIN" proposal reject "$TEST_PROJECT" latest "Need tighter validation" >/dev/null
 
-python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" <<'PY'
+python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" "$STATUS_OUTPUT" <<'PY'
 import json
 import pathlib
 import sys
@@ -251,6 +256,7 @@ project = pathlib.Path(sys.argv[1])
 proposal_one = pathlib.Path(sys.argv[2])
 proposal_two = pathlib.Path(sys.argv[3])
 repo_root = pathlib.Path(sys.argv[4])
+status_output = sys.argv[5]
 status_text = (project / "docs" / ".gaeta" / "status.md").read_text(encoding="utf-8")
 pause_text = (project / "docs" / ".gaeta" / "pause.md").read_text(encoding="utf-8")
 project_text = (project / "PROJECT.md").read_text(encoding="utf-8")
@@ -261,6 +267,11 @@ proposal_two_text = proposal_two.read_text(encoding="utf-8")
 assert "## In progress" in status_text, status_text
 assert "Implement sync behavior." in status_text, status_text
 assert "Add methodology-enforced instructions." in status_text, status_text
+assert "gaeta status" in status_output, status_output
+assert "phase: Phase X" in status_output, status_output
+assert "next step: Implement sync behavior." in status_output, status_output
+assert "blockers:" in status_output, status_output
+assert "- none" in status_output, status_output
 assert "# Pause" in pause_text, pause_text
 assert "Phase X" in pause_text, pause_text
 assert "## Next Step" in project_text, project_text
@@ -278,6 +289,7 @@ expected = {
     "review.md": "agent: review",
     "evolve.md": "agent: plan",
     "resume.md": "agent: plan",
+    "status.md": "agent: plan",
 }
 for name, marker in expected.items():
     text = (commands_dir / name).read_text(encoding="utf-8")

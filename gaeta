@@ -28,6 +28,7 @@ Safe OpenCode wrapper using bubblewrap with optional Landlock defense-in-depth.
 Usage:
   gaeta init [--force] [PROJECT_DIR]
   gaeta doctor [PROJECT_DIR]
+  gaeta status [PROJECT_DIR]
   gaeta resume [--show] [PROJECT_DIR]
   gaeta r [--show] [PROJECT_DIR]
   gaeta pause [PROJECT_DIR]
@@ -38,6 +39,7 @@ Usage:
 Options:
   init                  Initialize gaeta workflow files in a project
   doctor                 Run gaeta self-inspection checks
+  status                 Show phase, next step, pending sprint items, blockers
   resume, r              Show phase/next-step resume context
   pause                  Sync workflow docs and write pause snapshot
   proposal               Manage approval-gated proposal artifacts
@@ -133,6 +135,8 @@ Examples:
   gaeta doctor             # inspect gaeta config and projection health
   gaeta doctor --json      # inspect gaeta health as JSON
   gaeta doctor ../repo     # inspect another project
+  gaeta status             # show current phase/next/pending/blockers
+  gaeta status ../repo     # show status for another project
   gaeta resume             # launch opencode with resume prompt
   gaeta resume --show      # show resolved resume command without launching
   GAETA_RESUME_AGENT=plan gaeta r --show # preview resume agent launch
@@ -1404,6 +1408,137 @@ PY
   printf '[%s] pause: synced status and wrote docs/.gaeta/pause.md\n' "$(date -Iseconds)" >>"${runtime_log}"
 
   info "pause updated: ${status_path} and ${pause_path}"
+  return 0
+}
+
+run_status_command() {
+  local target_project="${PWD}"
+  local -a status_positionals=()
+
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'STATUS_HELP'
+Usage:
+  gaeta status [PROJECT_DIR]
+
+Shows a concise workflow snapshot from docs/.gaeta:
+  - current phase
+  - next step
+  - top pending sprint items
+  - blockers
+STATUS_HELP
+    return 0
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    status_positionals+=("$1")
+    shift
+  done
+
+  if [[ ${#status_positionals[@]} -gt 1 ]]; then
+    error "status accepts at most one optional PROJECT_DIR"
+    return 1
+  fi
+
+  if [[ ${#status_positionals[@]} -eq 1 ]]; then
+    target_project="${status_positionals[0]}"
+  fi
+
+  if [[ ! -d "${target_project}" ]]; then
+    error "status project directory does not exist: ${target_project}"
+    return 1
+  fi
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    error "python3 is required for status command"
+    return 1
+  fi
+
+  target_project="$(realpath "${target_project}")"
+
+  if ! require_project_initialized "${target_project}" "status"; then
+    return 1
+  fi
+
+  local status_file="${target_project}/docs/.gaeta/status.md"
+  local checklist_file="${target_project}/docs/.gaeta/checklist.md"
+
+  if ! python3 - "${target_project}" "${status_file}" "${checklist_file}" <<'PY'; then
+import pathlib
+import re
+import sys
+
+
+def section_body(text: str, heading: str) -> str:
+    pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.MULTILINE)
+    match = pattern.search(text)
+    if not match:
+        return ""
+    start = match.end()
+    remaining = text[start:]
+    next_heading = re.search(r"^##\s+", remaining, re.MULTILINE)
+    if next_heading:
+        return remaining[: next_heading.start()].strip()
+    return remaining.strip()
+
+
+def one_line(text: str, fallback: str) -> str:
+    parts = [line.strip() for line in text.splitlines() if line.strip()]
+    return " ".join(parts) if parts else fallback
+
+
+def normalize_bullets(text: str, fallback: str) -> list[str]:
+    rows: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("- "):
+            rows.append(line)
+        else:
+            rows.append(f"- {line}")
+    return rows or [fallback]
+
+
+project = pathlib.Path(sys.argv[1])
+status_path = pathlib.Path(sys.argv[2])
+checklist_path = pathlib.Path(sys.argv[3])
+
+status_text = status_path.read_text(encoding="utf-8")
+checklist_text = checklist_path.read_text(encoding="utf-8")
+
+phase_value = one_line(section_body(status_text, "Current phase"), "unknown")
+next_step_value = one_line(section_body(status_text, "Next step"), "(not defined)")
+blocker_rows = normalize_bullets(section_body(status_text, "Blockers"), "- none")
+
+pending_sprint: list[str] = []
+in_current_sprint = False
+for raw in checklist_text.splitlines():
+    line = raw.strip()
+    if line.startswith("## "):
+        in_current_sprint = line == "## Current Sprint"
+        continue
+    if in_current_sprint and line.startswith("- [ ] "):
+        pending_sprint.append(line[6:].strip())
+
+print("gaeta status")
+print(f"  project: {project}")
+print(f"  phase: {phase_value}")
+print(f"  next step: {next_step_value}")
+print("  top pending sprint items:")
+if pending_sprint:
+    for item in pending_sprint[:5]:
+        print(f"    - {item}")
+else:
+    print("    - none")
+
+print("  blockers:")
+for row in blocker_rows[:5]:
+    print(f"    {row}")
+PY
+    error "failed to render status"
+    return 1
+  fi
+
   return 0
 }
 
@@ -3011,6 +3146,15 @@ fi
 if [[ "${1:-}" == "doctor" ]]; then
   shift
   if ! run_doctor_command "$@"; then
+    exit 1
+  fi
+  exit 0
+fi
+
+# Command dispatch: gaeta status ...
+if [[ "${1:-}" == "status" ]]; then
+  shift
+  if ! run_status_command "$@"; then
     exit 1
   fi
   exit 0

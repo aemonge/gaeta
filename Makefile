@@ -41,6 +41,9 @@ legacy-clean:
 	@rm -f "$(GAETA_CONFIG_HOME)/agents/reviewer.md"
 	@rm -f "$(GAETA_CONFIG_HOME)/agents/qa.md"
 	@rm -f "$(GAETA_CONFIG_HOME)/agents/evolution.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/agents/architect.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/agents/implementer.md"
+	@rm -f "$(GAETA_CONFIG_HOME)/agents/handoff-writer.md"
 	@printf "$(GREEN)[OK] legacy templates cleaned from $(GAETA_CONFIG_HOME)$(NC)\n"
 
 lint:

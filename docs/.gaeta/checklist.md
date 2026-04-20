@@ -44,13 +44,15 @@
 - [x] Convert agent profiles to explicit allowlists with fallback `ask` for unknown commands (no planned per-command asks).
 - [x] Enforce human-in-the-loop git flow by denying `git*` in `build` agent profile.
 - [x] Hard-cut agent roster to `plan`, `build`, and `review`.
-- [x] Hard-cut slash commands to `/resume`, `/pause`, `/review`, and `/evolve`.
+- [x] Set operator slash commands to `/resume`, `/status`, `/pause`, `/review`, and `/evolve`.
 - [x] Rename workflow checkpoint command from `gaeta handoff` to `gaeta pause` and emit `docs/.gaeta/pause.md` snapshots.
 - [x] Update resume context preference to `docs/.gaeta/pause.md`.
 - [x] Remove legacy `handoff.md` resume fallback and keep pause-only session continuity.
 - [x] Add `make legacy-clean` to remove legacy command/agent templates from `~/.config/gaeta`.
 - [x] Fix `gaeta doctor` sandbox probe so custom `-b /bin/bash` checks do not get default `--agent` injection.
 - [x] Normalize `tests/doctor.bats` shell style so `shellharden --check` passes in `make lint`.
+- [x] Add `gaeta status` and `/status` to show phase, next step, pending sprint items, and blockers.
+- [x] Extend `make legacy-clean` to remove stale legacy role prompts (`architect`, `implementer`, `handoff-writer`) from `~/.config/gaeta/agents`.
 
 ## Current
 

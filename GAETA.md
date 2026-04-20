@@ -45,6 +45,7 @@ At session end:
 ## Operator Slash Commands
 
 - Session resume: `/resume`.
+- Session snapshot: `/status`.
 - Session checkpoint: `/pause`.
 - Implementation review and validation: `/review`.
 - Agent/workflow evolution: `/evolve`.
