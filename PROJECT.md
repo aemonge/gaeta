@@ -18,10 +18,11 @@
 - Proposal workflow remains available via `gaeta proposal create|list|approve|reject` with artifacts under `docs/.gaeta/proposals/`.
 - OpenCode agent roster is now minimal and role-aligned: `plan`, `build`, `review`.
 - Hard-save backups are now available via `gaeta backup [PROJECT_DIR]` under `docs/.gaeta/backups/` with a manifest documenting explicit runtime exclusions.
+- Config projection examples are documented in both `docs/config-sample.md` and `docs/architecture.md`.
 
 ## Next Step
 
-Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
+Add projection safety matrix for symlink vs mirror decisions.
 
 ## Resume Prompt
 

@@ -71,10 +71,11 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Backup manifest now documents included workflow files plus explicit runtime exclusions (`.gaeta/session.log`, `.gaeta/approval.log`, `.gaeta/command.json`, `.gaeta/projection/`).
 - Updated `/review` command contract so successful reviews proactively include a Conventional Commit suggestion.
 - Improved `gaeta backup` UX output with human-readable stderr guidance while keeping stdout as the absolute backup directory path for scripting.
+- Added config projection examples in both `docs/config-sample.md` and `docs/architecture.md`, with test assertions to keep both references in sync.
 
 ## In progress
 
-- Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
+- Add projection safety matrix for symlink vs mirror decisions.
 
 ## Blockers
 
@@ -82,7 +83,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` projection pair.
+Add projection safety matrix for symlink vs mirror decisions.
 
 ## Decisions
 
@@ -120,3 +121,4 @@ Add sample `~/.config/gaeta/opencode.json` and generated `opencode.json` project
 - Hard-save feature naming is now `backup` (not `snapshot`) for command/help/test consistency.
 - Backup output/manifest wording must stay project-relative and must not assume direct host-home visibility under bubblewrap.
 - Successful `/review` runs should include a single `Suggested commit:` Conventional Commit line when no blocking issues are found.
+- Config projection behavior is now documented twice by design: quick reference in `docs/config-sample.md` and architecture pointer in `docs/architecture.md`.

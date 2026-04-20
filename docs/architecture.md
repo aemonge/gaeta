@@ -479,6 +479,12 @@ Configuration includes:
 - Tool permissions
 - UI preferences
 
+### gaeta projection sample
+
+For a concrete `~/.config/opencode/opencode.json` + `~/.config/gaeta/opencode.json`
+example and the expected `.gaeta/projection/opencode.json` output, see
+`docs/config-sample.md`.
+
 ## Security Model
 
 ### Isolation Layers

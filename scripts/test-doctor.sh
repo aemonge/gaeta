@@ -329,6 +329,14 @@ review_text = (commands_dir / "review.md").read_text(encoding="utf-8")
 assert "Suggested commit:" in review_text, review_text
 assert "Conventional Commit" in review_text, review_text
 
+config_sample = (repo_root / "docs" / "config-sample.md").read_text(encoding="utf-8")
+assert "~/.config/opencode/opencode.json" in config_sample, config_sample
+assert "~/.config/gaeta/opencode.json" in config_sample, config_sample
+assert ".gaeta/projection/opencode.json" in config_sample, config_sample
+
+architecture_text = (repo_root / "docs" / "architecture.md").read_text(encoding="utf-8")
+assert "docs/config-sample.md" in architecture_text, architecture_text
+
 config = json.loads((repo_root / "opencode.json").read_text(encoding="utf-8"))
 for agent_name in ["plan", "build", "review"]:
     assert agent_name in config["agent"], agent_name
