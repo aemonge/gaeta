@@ -73,6 +73,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Improved `gaeta backup` UX output with human-readable stderr guidance while keeping stdout as the absolute backup directory path for scripting.
 - Added config projection examples in both `docs/config-sample.md` and `docs/architecture.md`, with test assertions to keep both references in sync.
 - Added a projection safety matrix to `docs/architecture.md` and locked gaeta projection policy to mirror-only for deterministic sandbox-safe binds.
+- Added `/go` slash command (`agent: build`) to provide an action-oriented kickoff bundle for the next implementation slice.
 
 ## In progress
 
@@ -124,3 +125,4 @@ Add Linux/macOS portability notes.
 - Successful `/review` runs should include a single `Suggested commit:` Conventional Commit line when no blocking issues are found.
 - Config projection behavior is now documented twice by design: quick reference in `docs/config-sample.md` and architecture pointer in `docs/architecture.md`.
 - Projection policy is now explicitly mirror-only for config and directory artifacts; symlink projection is intentionally not used.
+- Operator slash command surface now includes `/go` for immediate build-mode kickoff.

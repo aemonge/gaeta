@@ -316,6 +316,7 @@ commands_dir = repo_root / ".opencode" / "commands"
 agents_dir = repo_root / ".opencode" / "agents"
 expected = {
     "pause.md": "agent: build",
+    "go.md": "agent: build",
     "review.md": "agent: review",
     "evolve.md": "agent: plan",
     "resume.md": "agent: plan",

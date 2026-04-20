@@ -14,7 +14,7 @@
 - Resume priority: `gaeta resume` now reads `docs/.gaeta/pause.md` context first, then `PROJECT.md`/`status.md` fallback (no legacy handoff fallback).
 - Runtime permissions: root `opencode.json` now uses an allow baseline for `read`/`edit`/`external_directory` plus explicit destructive bash denies.
 - Pause operator surface: use OpenCode `/pause` as the canonical session checkpoint command.
-- Operator slash commands are now: `/resume`, `/status`, `/pause`, `/review`, `/evolve`.
+- Operator slash commands are now: `/resume`, `/status`, `/pause`, `/go`, `/review`, `/evolve`.
 - Proposal workflow remains available via `gaeta proposal create|list|approve|reject` with artifacts under `docs/.gaeta/proposals/`.
 - OpenCode agent roster is now minimal and role-aligned: `plan`, `build`, `review`.
 - Hard-save backups are now available via `gaeta backup [PROJECT_DIR]` under `docs/.gaeta/backups/` with a manifest documenting explicit runtime exclusions.
