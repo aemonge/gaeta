@@ -36,11 +36,12 @@
 - `gaeta backup` remains supported and is not deprecated.
 - Proposal guidance is now native-first for approve/reject (`/approve` / `/reject`) with explicit `gaeta proposal` fallback commands.
 - OpenCode TUI agent-selection UX review is documented in `docs/tui-agent-ux-review.md`.
-- Legacy `gaeta proposal` subcommands remain supported for now; removal is deferred until `/evolve` UX parity.
+- `GAETA.md` now includes an operator-facing role/command matrix.
+- Legacy `gaeta proposal` subcommands remain supported until `/evolve` parity, then should be removed immediately (no deprecation window).
 
 ## Next Step
 
-Add an operator-facing role/command matrix in `GAETA.md` and link it to `docs/tui-agent-ux-review.md`.
+No active planned slice; resume deferred backlog items only when reprioritized.
 
 ## Resume Prompt
 

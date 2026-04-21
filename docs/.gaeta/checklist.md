@@ -44,7 +44,8 @@
 - [x] Confirm `build` defaults keep `todowrite`, `python -q`, and `pytest` enabled with project-level strict override guidance.
 - [x] Re-evaluate backup deprecation and keep `gaeta backup` as supported for now.
 - [x] Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
-- [x] Decide to keep legacy `gaeta proposal` subcommands for now; prefer native `/approve`/`/reject` and revisit removal after `/evolve` parity.
+- [x] Add operator-facing role/command matrix in `GAETA.md`.
+- [x] Finalize legacy `gaeta proposal` subcommand removal policy: remove immediately after `/evolve` parity (no deprecation window).
 - [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan (deferred, not planned now).
 - [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
 - [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.

@@ -19,4 +19,4 @@
 - [x] Update gaeta command/agent prompt templates to explicitly account for bubblewrap isolation (no direct access to host home paths) and prefer reporting host-side verification steps when needed.
 - [x] Evaluate whether `build` should default-allow `todowrite`, `python -q`, and `pytest` in all environments; keep an escape hatch for stricter repos.
 - [x] Re-evaluate whether backup command should be deprecated now that init-first onboarding and handoff continuity are in place.
-- [x] Decide whether to remove legacy `gaeta proposal` subcommands once `/evolve` command UX is finalized.
+- [x] Decide whether to remove legacy `gaeta proposal` subcommands once `/evolve` command UX is finalized (remove immediately after parity; no deprecation window).
