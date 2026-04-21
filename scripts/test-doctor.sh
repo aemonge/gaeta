@@ -278,6 +278,9 @@ assert "go: recovered cycle state to safe defaults" in session_log, session_log
 assert "go: reset rotation to plan after git HEAD change" in session_log, session_log
 assert "# Pause" in pause_text, pause_text
 assert "Phase X" in pause_text, pause_text
+assert "## /go cycle" in pause_text, pause_text
+assert "selected role: plan" in pause_text, pause_text
+assert "next role in cycle: build" in pause_text, pause_text
 assert "## Next Step" in project_text, project_text
 assert "pause: synced status and wrote docs/.gaeta/pause.md" in session_log, session_log
 assert "backup: wrote docs/.gaeta/backups/backup-" in session_log, session_log

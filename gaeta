@@ -1407,6 +1407,7 @@ PAUSE_HELP
   local status_path="${gaeta_dir}/status.md"
   local backlog_path="${gaeta_dir}/backlog.md"
   local pause_path="${gaeta_dir}/pause.md"
+  local go_cycle_path="${target_project}/.gaeta/go-cycle.json"
   local project_path="${target_project}/PROJECT.md"
   local runtime_log="${target_project}/.gaeta/session.log"
 
@@ -1414,8 +1415,9 @@ PAUSE_HELP
     return 1
   fi
 
-  if ! python3 - "$checklist_path" "$status_path" "$backlog_path" "$pause_path" "$project_path" <<'PY'
+  if ! python3 - "$checklist_path" "$status_path" "$backlog_path" "$pause_path" "$project_path" "$go_cycle_path" <<'PY'
 import datetime
+import json
 import pathlib
 import re
 import sys
@@ -1464,6 +1466,7 @@ status_path = pathlib.Path(sys.argv[2])
 backlog_path = pathlib.Path(sys.argv[3])
 pause_path = pathlib.Path(sys.argv[4])
 project_path = pathlib.Path(sys.argv[5])
+go_cycle_path = pathlib.Path(sys.argv[6])
 
 status_text = status_path.read_text(encoding="utf-8") if status_path.exists() else ""
 checklist_text = checklist_path.read_text(encoding="utf-8") if checklist_path.exists() else ""
@@ -1499,6 +1502,25 @@ if pending_backlog:
 else:
     backlog_body = "- none"
 
+go_order = ["plan", "build", "review"]
+go_selected_role = "plan"
+go_next_role = "build"
+go_cycle_note = "derived from defaults (run `gaeta go` to persist state)"
+
+if go_cycle_path.exists():
+    try:
+        cycle_payload = json.loads(go_cycle_path.read_text(encoding="utf-8"))
+        if isinstance(cycle_payload, dict):
+            if cycle_payload.get("last_agent") in go_order:
+                go_selected_role = cycle_payload["last_agent"]
+            if cycle_payload.get("next_agent") in go_order:
+                go_next_role = cycle_payload["next_agent"]
+            go_cycle_note = "loaded from `.gaeta/go-cycle.json`"
+        else:
+            go_cycle_note = "cycle state unreadable; using safe defaults"
+    except Exception:
+        go_cycle_note = "cycle state unreadable; using safe defaults"
+
 timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 pause_text = (
     "# Pause\n\n"
@@ -1520,6 +1542,11 @@ pause_text = (
     f"{next_step_value}\n\n"
     "## Top pending sprint items\n\n"
     f"{sprint_body}\n\n"
+    "## /go cycle\n\n"
+    f"- selected role: {go_selected_role}\n"
+    f"- next role in cycle: {go_next_role}\n"
+    f"- order: {' -> '.join(go_order)}\n"
+    f"- note: {go_cycle_note}\n\n"
     "## Blockers\n\n"
     f"{blockers_value}\n\n"
     "## Top backlog items\n\n"

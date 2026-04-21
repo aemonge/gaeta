@@ -423,6 +423,9 @@ assert "Pending capture via /pause." in pause_text, pause_text
 assert "## Top pending sprint items" in pause_text, pause_text
 assert "Implement sync behavior." in pause_text, pause_text
 assert "Add methodology-enforced instructions." in pause_text, pause_text
+assert "## /go cycle" in pause_text, pause_text
+assert "selected role: plan" in pause_text, pause_text
+assert "next role in cycle: build" in pause_text, pause_text
 
 assert "## Next Step" in project_text, project_text
 assert "Implement sync behavior." in project_text, project_text
