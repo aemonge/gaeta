@@ -27,6 +27,7 @@
 - Doctor test fixtures are now centralized under `tests/fixtures/`.
 - Migration guidance from legacy `docs/.opencode` paths is documented in `docs/migration-docs-opencode.md`.
 - `make lint` now runs shellharden in-band for both test scripts and the `gaeta` wrapper.
+- Runtime launch-path coverage now includes shellharden-refactored branches for `--not-paranoid` and missing-`landrun` `--require-landlock` behavior.
 
 ## Next Step
 

@@ -80,6 +80,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Added reusable test fixture repository layout under `tests/fixtures/` and updated doctor test harnesses to copy fixtures instead of inline heredocs.
 - Added `docs/migration-docs-opencode.md` documenting migration from legacy `docs/.opencode/` template paths to canonical repo-root `.opencode/`.
 - Completed wrapper shellharden compliance for `gaeta`; `make lint` now reports `shellharden` success for both test scripts and the wrapper.
+- Added runtime test coverage for shellharden-refactored launch branches: `--not-paranoid` bubblewrap path and `--require-landlock` failure when `landrun` is unavailable.
 
 ## In progress
 
@@ -138,3 +139,4 @@ Extend `gaeta pause` snapshot detail (without adding extra alias commands).
 - Doctor test setup now uses repository fixtures in `tests/fixtures/` to reduce duplication across `tests/doctor.bats` and `scripts/test-doctor.sh`.
 - Command/agent templates are canonical under repo-root `.opencode/`; `docs/.opencode/` is legacy and should be migrated using `docs/migration-docs-opencode.md`.
 - Shellharden lint policy now includes the main `gaeta` wrapper in `make lint` as a strict in-band check.
+- Reviewer-agent medium/high risk findings must be recorded in `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md` before the session ends.

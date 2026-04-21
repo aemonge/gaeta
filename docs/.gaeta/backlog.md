@@ -8,6 +8,8 @@
 - [x] Add fixture repository layout.
 - [x] Add migration note for projects using `docs/.opencode`.
 - [x] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
+- [x] Add runtime coverage for shellharden-refactored launch branches (`--not-paranoid`, `--require-landlock` without `landrun`).
+- [ ] Ensure reviewer-agent medium/high risk findings are written back into `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md` before session end.
 - [ ] Extend `gaeta pause` snapshot detail (without adding extra alias commands).
 - [ ] Investigate slow startup path for `gaeta` and add profiling-based optimization plan.
 - [ ] Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.

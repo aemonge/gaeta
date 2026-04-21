@@ -35,6 +35,7 @@
 - [x] Add fixture repository layout.
 - [x] Add migration note for projects using `docs/.opencode`.
 - [x] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
+- [x] Add runtime branch coverage for shellharden-refactored launch paths (`--not-paranoid`, missing `landrun` with `--require-landlock`).
 - [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
 - [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.
 - [x] Add OpenCode slash-command pack: `/check`, `/doctor`, `/propose`, `/approve`, `/reject`, `/resume`.
