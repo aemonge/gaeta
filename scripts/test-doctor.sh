@@ -323,6 +323,17 @@ for name, marker in expected.items():
 review_text = (commands_dir / "review.md").read_text(encoding="utf-8")
 assert "Suggested commit:" in review_text, review_text
 assert "Conventional Commit" in review_text, review_text
+assert "sandbox/bubblewrap visibility prevents direct verification" in review_text, review_text
+assert "host-side verification commands" in review_text, review_text
+
+pause_text = (commands_dir / "pause.md").read_text(encoding="utf-8")
+assert "host-side verification is required" in pause_text, pause_text
+
+review_agent_text = (agents_dir / "review.md").read_text(encoding="utf-8")
+assert "do not claim direct verification" in review_agent_text, review_agent_text
+
+build_agent_text = (agents_dir / "build.md").read_text(encoding="utf-8")
+assert "host-side verification commands" in build_agent_text, build_agent_text
 
 config_sample = (repo_root / "docs" / "config-sample.md").read_text(encoding="utf-8")
 assert "~/.config/opencode/opencode.json" in config_sample, config_sample
