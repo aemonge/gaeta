@@ -37,6 +37,7 @@
 - [x] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
 - [x] Add runtime branch coverage for shellharden-refactored launch paths (`--not-paranoid`, missing `landrun` with `--require-landlock`).
 - [x] Extend `gaeta pause` snapshot detail to include `/go` cycle state.
+- [x] Update command/agent prompt templates with bubblewrap host-visibility guidance and host-side verification fallback wording.
 - [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan.
 - [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
 - [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.

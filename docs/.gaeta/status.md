@@ -82,6 +82,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Completed wrapper shellharden compliance for `gaeta`; `make lint` now reports `shellharden` success for both test scripts and the wrapper.
 - Added runtime test coverage for shellharden-refactored launch branches: `--not-paranoid` bubblewrap path and `--require-landlock` failure when `landrun` is unavailable.
 - Extended `gaeta pause` snapshots to include `/go` cycle state (`selected role`, `next role`, and cycle-state note) and added tests for the new snapshot fields.
+- Updated command/agent prompt templates to explicitly account for bubblewrap host-path visibility limits and require host-side verification commands when direct verification is not possible.
 
 ## In progress
 
@@ -142,3 +143,4 @@ Investigate slow startup path for `gaeta` and add a profiling-based optimization
 - Shellharden lint policy now includes the main `gaeta` wrapper in `make lint` as a strict in-band check.
 - Reviewer-agent medium/high risk findings must be recorded in `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md` before the session ends.
 - Pause snapshots include `/go` cycle-state context for better handoff continuity without adding new alias commands.
+- Prompt templates now require explicit host-side verification guidance whenever sandbox visibility limits direct inspection of host-home paths.

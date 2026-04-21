@@ -29,6 +29,7 @@
 - `make lint` now runs shellharden in-band for both test scripts and the `gaeta` wrapper.
 - Runtime launch-path coverage now includes shellharden-refactored branches for `--not-paranoid` and missing-`landrun` `--require-landlock` behavior.
 - `gaeta pause` snapshot now includes `/go` cycle context (`selected role` and `next role in cycle`).
+- Command/agent prompt templates now explicitly handle bubblewrap host-path visibility limits and require host-side verification commands when needed.
 
 ## Next Step
 
