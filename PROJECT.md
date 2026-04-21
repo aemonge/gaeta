@@ -34,6 +34,7 @@
 - Review prompts now require medium/high-risk follow-up writeback into checklist/backlog before session end.
 - Build defaults keep `todowrite`, `python -q`, and `pytest` enabled, with strictness handled through project-local overrides.
 - `gaeta backup` remains supported and is not deprecated.
+- Proposal guidance is now native-first for approve/reject (`/approve` / `/reject`) with explicit `gaeta proposal` fallback commands.
 
 ## Next Step
 

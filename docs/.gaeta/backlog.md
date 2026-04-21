@@ -13,7 +13,7 @@
 - [x] Extend `gaeta pause` snapshot detail (without adding extra alias commands).
 - [ ] Investigate slow startup path for `gaeta` and add profiling-based optimization plan.
 - [ ] Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
-- [ ] Integrate proposal approval/rejection with OpenCode native approve/reject flow semantics.
+- [x] Integrate proposal approval/rejection with OpenCode native approve/reject flow semantics.
 - [ ] Create a full TUI demo script (with video) for `plan -> build -> review` with `/resume`, `/pause`, and `/evolve`.
 - [x] Fix slash-command launcher robustness when `gaeta` is not available in PATH from non-gaeta projects (`/pause` currently fails with `gaeta: command not found` in some sessions).
 - [x] Update gaeta command/agent prompt templates to explicitly account for bubblewrap isolation (no direct access to host home paths) and prefer reporting host-side verification steps when needed.

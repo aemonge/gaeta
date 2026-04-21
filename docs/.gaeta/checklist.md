@@ -40,6 +40,7 @@
 - [x] Update command/agent prompt templates with bubblewrap host-visibility guidance and host-side verification fallback wording.
 - [x] Fix slash-command launcher robustness when `gaeta` is not available in PATH by adding a per-user fallback launcher path.
 - [x] Require reviewer-agent medium/high risk follow-ups to be written back into checklist/backlog before session end.
+- [x] Integrate proposal approve/reject guidance with native OpenCode semantics first and explicit `gaeta proposal` fallback commands.
 - [x] Confirm `build` defaults keep `todowrite`, `python -q`, and `pytest` enabled with project-level strict override guidance.
 - [x] Re-evaluate backup deprecation and keep `gaeta backup` as supported for now.
 - [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan (deferred by operator).
