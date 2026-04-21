@@ -575,6 +575,10 @@ for name, marker in expected.items():
     assert marker in text, (name, marker)
     assert "~/.config/gaeta/bin/gaeta" in text, name
 
+evolve_text = (commands / "evolve.md").read_text(encoding="utf-8")
+assert "native OpenCode semantics first (`/approve` / `/reject`)" in evolve_text, evolve_text
+assert "fallback commands: `gaeta proposal approve . latest`" in evolve_text, evolve_text
+
 review_text = (commands / "review.md").read_text(encoding="utf-8")
 assert "Suggested commit:" in review_text, review_text
 assert "Conventional Commit" in review_text, review_text
@@ -611,6 +615,8 @@ assert "Linux/macOS portability notes are documented in `docs/architecture.md`."
 gaeta_text = (repo / "GAETA.md").read_text(encoding="utf-8")
 assert "Default build-agent behavior keeps practical validation commands enabled" in gaeta_text, gaeta_text
 assert "`gaeta backup` remains supported (not deprecated)" in gaeta_text, gaeta_text
+assert "Strict-repo override example" in gaeta_text, gaeta_text
+assert "Defer deprecation unless there is a validated replacement" in gaeta_text, gaeta_text
 
 config = json.loads((repo / "opencode.json").read_text(encoding="utf-8"))
 for agent_name in ["plan", "build", "review"]:

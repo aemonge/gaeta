@@ -21,4 +21,5 @@ Then reply with:
 - one-line summary,
 - exact changes requested,
 - validation commands,
-- explicit recommendation to run `gaeta proposal approve . latest` or `gaeta proposal reject . latest "<reason>"`.
+- explicit recommendation to approve/reject using native OpenCode semantics first (`/approve` / `/reject`) when available in the current environment,
+- explicit fallback commands: `gaeta proposal approve . latest` or `gaeta proposal reject . latest "<reason>"`.

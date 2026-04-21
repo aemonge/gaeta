@@ -65,11 +65,13 @@ At session end:
 - Default build-agent behavior keeps practical validation commands enabled: `todowrite`, `python -q`, and `pytest`.
 - For stricter repositories, use a project-local override in `opencode.json` to tighten `build` permissions instead of changing global defaults.
 - Keep stricter overrides explicit and versioned per project.
+- Strict-repo override example: set `agent.build.permission.todowrite` to `deny` and tighten `agent.build.permission.bash` entries for `python -q` / `pytest` in the project-local `opencode.json`.
 
 ## Backup Policy
 
 - `gaeta backup` remains supported (not deprecated) as a hard-save guardrail for workflow continuity.
 - Revisit deprecation only after equivalent safety and recovery guarantees are proven across init/pause/resume flows.
+- Defer deprecation unless there is a validated replacement that preserves the same recoverability guarantees for workflow files and operator checkpoints.
 
 ## Source of Truth
 
