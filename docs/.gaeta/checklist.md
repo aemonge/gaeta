@@ -45,6 +45,8 @@
 - [x] Re-evaluate backup deprecation and keep `gaeta backup` as supported for now.
 - [x] Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
 - [x] Add operator-facing role/command matrix in `GAETA.md`.
+- [x] Define low-risk MCP expansion baseline (`context7`, `playwright`, `postgres`), keep Semgrep optional, and avoid Perplexity API integration.
+- [x] Tighten allow/ask policy: deny `plan` `todowrite`, scope build-agent bash allows to explicit test/build commands, and avoid overlapping wildcard families.
 - [x] Finalize legacy `gaeta proposal` subcommand removal policy: remove immediately after `/evolve` parity (no deprecation window).
 - [x] Refresh `README.md` for public sharing with quickstart, audience fit, status caveats, and a 30-second operator flow.
 - [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan (deferred, not planned now).

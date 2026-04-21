@@ -33,16 +33,18 @@
 - Slash-command launcher resolution now includes `~/.config/gaeta/bin/gaeta` fallback, and `make build` installs the launcher there.
 - Review prompts now require medium/high-risk follow-up writeback into checklist/backlog before session end.
 - Build defaults keep `todowrite`, `python -q`, and `pytest` enabled, with strictness handled through project-local overrides.
+- Permission hardening now keeps `plan` non-mutating (`todowrite` denied) and scopes build-agent bash allows to explicit test/build commands while avoiding overlapping wildcard families.
 - `gaeta backup` remains supported and is not deprecated.
 - Proposal guidance is now native-first for approve/reject (`/approve` / `/reject`) with explicit `gaeta proposal` fallback commands.
 - OpenCode TUI agent-selection UX review is documented in `docs/tui-agent-ux-review.md`.
 - `GAETA.md` now includes an operator-facing role/command matrix.
 - Legacy `gaeta proposal` subcommands remain supported until `/evolve` parity, then should be removed immediately (no deprecation window).
 - `README.md` now includes a public-friendly quickstart, audience fit, status caveats, and a short operator flow for new users.
+- MCP expansion policy now prefers a low-risk baseline (`context7`, `playwright`, `postgres`), keeps Semgrep optional, and excludes direct Perplexity API integration.
 
 ## Next Step
 
-No active planned slice; resume deferred backlog items only when reprioritized.
+Implement MCP config/validation slice for the low-risk baseline: document concrete server examples and add `gaeta doctor` checks for malformed MCP entries.
 
 ## Resume Prompt
 

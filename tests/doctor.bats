@@ -628,7 +628,11 @@ for removed in ["discovery", "orchestrator", "reviewer", "qa", "evolution", "arc
     assert removed not in config["agent"], removed
 
 assert config["agent"]["plan"]["permission"]["bash"]["git status *"] == "allow", config
+assert config["agent"]["plan"]["permission"]["todowrite"] == "deny", config
 assert config["agent"]["build"]["permission"]["bash"]["git*"] == "deny", config
+build_bash = config["agent"]["build"]["permission"]["bash"]
+for removed in ["python", "python *", "cargo", "cargo *", "go", "go *", "npm", "npm *"]:
+    assert removed not in build_bash, removed
 
 for agent_name in ["plan", "build", "review"]:
     path = agents_dir / f"{agent_name}.md"

@@ -75,9 +75,18 @@ At session end:
 ## Build Permission Policy
 
 - Default build-agent behavior keeps practical validation commands enabled: `todowrite`, `python -q`, and `pytest`.
+- Build-agent bash allowances are intentionally scoped to test/build workflows; unknown commands should route through fallback `ask` instead of broad wildcard allows.
 - For stricter repositories, use a project-local override in `opencode.json` to tighten `build` permissions instead of changing global defaults.
 - Keep stricter overrides explicit and versioned per project.
 - Strict-repo override example: set `agent.build.permission.todowrite` to `deny` and tighten `agent.build.permission.bash` entries for `python -q` / `pytest` in the project-local `opencode.json`.
+- Permission-map hygiene: avoid overlapping wildcard patterns that mix `allow` and `deny` for the same command family (for example `git*` and `git *`) so behavior stays auditable.
+
+## MCP Expansion Policy
+
+- Default MCP starter set: `context7` (docs/context), `playwright` (UI verification), and `postgres` (data/runtime checks).
+- Keep Semgrep MCP optional until a pinned or self-hosted integration path is validated for operational reliability.
+- Search-enhancer integrations should favor lower-risk, standard MCP providers; do not integrate Perplexity API directly into gaeta.
+- Advisory-source policy: search-enhancer and optional Semgrep outputs are advisory; implementation decisions should still be grounded in repo state, tests, and primary docs.
 
 ## Backup Policy
 

@@ -20,3 +20,5 @@
 - [x] Evaluate whether `build` should default-allow `todowrite`, `python -q`, and `pytest` in all environments; keep an escape hatch for stricter repos.
 - [x] Re-evaluate whether backup command should be deprecated now that init-first onboarding and handoff continuity are in place.
 - [x] Decide whether to remove legacy `gaeta proposal` subcommands once `/evolve` command UX is finalized (remove immediately after parity; no deprecation window).
+- [ ] Validate a low-risk non-Perplexity search MCP candidate and document advisory-use boundaries.
+- [ ] Evaluate Semgrep MCP integration using pinned/self-hosted setup guidance before enabling by default.

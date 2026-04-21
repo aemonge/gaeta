@@ -91,6 +91,8 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Added `docs/tui-agent-ux-review.md` with a ranked UX assessment for role-selection/operator flow and a smallest next implementation slice.
 - Added an operator-facing role/command matrix in `GAETA.md` and linked policy language to the TUI UX review outcomes.
 - Refreshed `README.md` for external sharing with a quickstart, audience fit, project status/caveats, and a short operator flow.
+- Added an MCP expansion policy in `GAETA.md` with a low-risk baseline (`context7`, `playwright`, `postgres`), Semgrep as optional, and no Perplexity API integration.
+- Tightened permission policy in `opencode.json`: `plan` now denies `todowrite`, build-agent bash allows are scoped to explicit test/build commands, and overlapping wildcard families are avoided.
 
 ## In progress
 
@@ -102,7 +104,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-No active planned slice; resume deferred backlog items only when reprioritized.
+Implement MCP config/validation slice for the low-risk baseline: document concrete server examples and add `gaeta doctor` checks for malformed MCP entries.
 
 ## Decisions
 
@@ -159,3 +161,5 @@ No active planned slice; resume deferred backlog items only when reprioritized.
 - Proposal approval guidance is now native-first (`/approve` / `/reject`) with `gaeta proposal` fallback for environments without native command support.
 - Legacy `gaeta proposal` subcommands stay supported until `/evolve` UX parity is demonstrated, then they should be removed immediately (no deprecation window).
 - Startup profiling and TUI demo script/video items are deferred and not planned for the current cycle.
+- MCP expansion policy is low-risk first: baseline servers are `context7`, `playwright`, and `postgres`; Semgrep is optional; Perplexity API is not integrated in gaeta.
+- Permission policy keeps global fallback permissive by operator choice, while agent-level rules prioritize explicit allowlists and avoid overlapping wildcard families.
