@@ -16,7 +16,9 @@ build:
 	@printf "$(BLUE)==> Installing gaeta config bundle$(NC)\n"
 	@mkdir -p "$(GAETA_CONFIG_HOME)/commands"
 	@mkdir -p "$(GAETA_CONFIG_HOME)/agents"
+	@mkdir -p "$(GAETA_CONFIG_HOME)/bin"
 	@$(MAKE) legacy-clean >/dev/null
+	@install -m 0755 gaeta "$(GAETA_CONFIG_HOME)/bin/gaeta"
 	@install -m 0644 opencode.json "$(GAETA_CONFIG_HOME)/opencode.json"
 	@install -m 0644 .opencode/commands/*.md "$(GAETA_CONFIG_HOME)/commands/"
 	@install -m 0644 .opencode/agents/*.md "$(GAETA_CONFIG_HOME)/agents/"
@@ -26,7 +28,7 @@ build:
 	else \
 		printf "$(YELLOW)[SKIP] tui.json not found$(NC)\n"; \
 	fi
-	@printf "$(GREEN)[OK] installed opencode.json + command/agent templates to $(GAETA_CONFIG_HOME)$(NC)\n"
+	@printf "$(GREEN)[OK] installed gaeta launcher + opencode.json + command/agent templates to $(GAETA_CONFIG_HOME)$(NC)\n"
 
 legacy-clean:
 	@printf "$(BLUE)==> Removing legacy gaeta templates$(NC)\n"

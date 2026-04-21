@@ -573,6 +573,7 @@ expected = {
 for name, marker in expected.items():
     text = (commands / name).read_text(encoding="utf-8")
     assert marker in text, (name, marker)
+    assert "~/.config/gaeta/bin/gaeta" in text, name
 
 review_text = (commands / "review.md").read_text(encoding="utf-8")
 assert "Suggested commit:" in review_text, review_text
