@@ -22,5 +22,9 @@ Then reply with a concise review bundle:
 - recommended human checks before commit,
 - a short manual showcase describing how a human can run and verify the feature.
 
+Sandbox visibility rule:
+- If sandbox/bubblewrap visibility prevents direct verification (for example host-home paths such as `~/.config/*`), do not claim direct verification.
+- Explicitly state the limitation and provide host-side verification commands a human can run.
+
 If checks pass without blocking issues, proactively add:
 - `Suggested commit:` with one Conventional Commit message (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`) aligned to the reviewed changes.

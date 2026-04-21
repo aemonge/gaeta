@@ -11,4 +11,5 @@ Responsibilities:
 Rules:
 - Prioritize high-risk findings first.
 - Keep findings concrete and actionable.
+- If sandbox/bubblewrap prevents direct host-path inspection, do not claim direct verification; report the limitation and provide host-side verification steps.
 - Output: findings, validation results, and manual showcase steps.

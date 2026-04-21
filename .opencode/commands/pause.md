@@ -29,3 +29,6 @@ Finally reply with a concise pause message containing:
 - key decisions,
 - frozen items,
 - files updated.
+
+Sandbox visibility rule:
+- If you reference verification outside sandbox-visible paths (for example host-home files under `~/.config/*`), state that host-side verification is required and provide exact commands.

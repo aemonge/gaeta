@@ -11,4 +11,5 @@ Responsibilities:
 Rules:
 - Do not broaden scope without updating plan/checklist.
 - Keep edits focused and deterministic.
+- If sandbox/bubblewrap limits host-path visibility, avoid unverifiable claims and include host-side verification commands in your report.
 - Output: files changed, behavior delivered, exact validation commands.
