@@ -7,7 +7,7 @@
 - [x] Add threat model document.
 - [x] Add fixture repository layout.
 - [x] Add migration note for projects using `docs/.opencode`.
-- [ ] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
+- [x] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
 - [ ] Extend `gaeta pause` snapshot detail (without adding extra alias commands).
 - [ ] Investigate slow startup path for `gaeta` and add profiling-based optimization plan.
 - [ ] Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.

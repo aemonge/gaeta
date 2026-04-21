@@ -1,9 +1,10 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: build lint test legacy-clean
+.PHONY: build lint test legacy-clean shellharden-fix-wrapper
 
 SHELL_SOURCES := gaeta scripts/test-doctor.sh
 SHELLHARDEN_SOURCES := scripts/test-doctor.sh tests/doctor.bats
+SHELLHARDEN_WRAPPER_SOURCE := gaeta
 GAETA_CONFIG_HOME ?= $(HOME)/.config/gaeta
 
 GREEN := \033[0;32m
@@ -52,7 +53,12 @@ lint:
 	@shellcheck $(SHELL_SOURCES) && printf "$(GREEN)[OK] shellcheck$(NC)\n"
 	@shfmt -i 2 -ci -d scripts/test-doctor.sh tests/doctor.bats && printf "$(GREEN)[OK] shfmt$(NC)\n"
 	@if command -v shellharden >/dev/null 2>&1; then \
-		shellharden --check $(SHELLHARDEN_SOURCES) && printf "$(GREEN)[OK] shellharden$(NC)\n"; \
+		shellharden --check $(SHELLHARDEN_SOURCES) && printf "$(GREEN)[OK] shellharden tests$(NC)\n"; \
+		if shellharden --check $(SHELLHARDEN_WRAPPER_SOURCE); then \
+			printf "$(GREEN)[OK] shellharden gaeta wrapper$(NC)\n"; \
+		else \
+			printf "$(YELLOW)[WARN] shellharden gaeta wrapper has pending suggestions$(NC)\n"; \
+		fi; \
 	else \
 		printf "$(YELLOW)[SKIP] shellharden not found$(NC)\n"; \
 	fi
@@ -65,3 +71,8 @@ test:
 		printf "$(YELLOW)[SKIP] bats not found; using shell test fallback$(NC)\n"; \
 		./scripts/test-doctor.sh && printf "$(GREEN)[OK] shell fallback suite$(NC)\n"; \
 	fi
+
+shellharden-fix-wrapper:
+	@printf "$(BLUE)==> Applying shellharden wrapper fixes$(NC)\n"
+	@shellharden --transform gaeta > gaeta.shellharden && mv gaeta.shellharden gaeta && chmod +x gaeta
+	@printf "$(GREEN)[OK] shellharden transformed gaeta$(NC)\n"

@@ -210,13 +210,13 @@ warning() {
 }
 
 info() {
-  if [[ "${QUIET}" -eq 0 ]]; then
+  if [[ "$QUIET" -eq 0 ]]; then
     echo -e "${GREEN}${PROGRAM_NAME}: $*${NC}" >&2
   fi
 }
 
 info_blue() {
-  if [[ "${QUIET}" -eq 0 ]]; then
+  if [[ "$QUIET" -eq 0 ]]; then
     echo -e "${BLUE}${PROGRAM_NAME}: $*${NC}" >&2
   fi
 }
@@ -226,7 +226,7 @@ json_escape() {
   value=${value//\\/\\\\}
   value=${value//\"/\\\"}
   value=${value//$'\n'/\\n}
-  printf '%s' "${value}"
+  printf '%s' "$value"
 }
 
 init_projection_paths() {
@@ -247,7 +247,7 @@ merge_structured_config_files() {
     return 1
   fi
 
-  python3 - "${base_file}" "${override_file}" "${output_file}" <<'PY'
+  python3 - "$base_file" "$override_file" "$output_file" <<'PY'
 import json
 import pathlib
 import sys
@@ -325,23 +325,23 @@ select_overlay_config() {
   local opencode_file="$3"
   local merged_file="$4"
 
-  if [[ -f "${gaeta_file}" && -f "${opencode_file}" ]]; then
-    if ! merge_structured_config_files "${opencode_file}" "${gaeta_file}" "${merged_file}"; then
+  if [[ -f "$gaeta_file" && -f "$opencode_file" ]]; then
+    if ! merge_structured_config_files "$opencode_file" "$gaeta_file" "$merged_file"; then
       error "failed to merge ${config_name}: ${gaeta_file} over ${opencode_file}"
       return 1
     fi
     info "Using merged ${config_name} (gaeta precedence): ${gaeta_file} + ${opencode_file}"
-    printf '%s' "${merged_file}"
+    printf '%s' "$merged_file"
     return 0
   fi
 
-  if [[ -f "${gaeta_file}" ]]; then
-    printf '%s' "${gaeta_file}"
+  if [[ -f "$gaeta_file" ]]; then
+    printf '%s' "$gaeta_file"
     return 0
   fi
 
-  if [[ -f "${opencode_file}" ]]; then
-    printf '%s' "${opencode_file}"
+  if [[ -f "$opencode_file" ]]; then
+    printf '%s' "$opencode_file"
     return 0
   fi
 
@@ -358,7 +358,7 @@ merge_structured_directory_tree() {
     return 1
   fi
 
-  python3 - "${base_dir}" "${override_dir}" "${output_dir}" <<'PY'
+  python3 - "$base_dir" "$override_dir" "$output_dir" <<'PY'
 import json
 import pathlib
 import shutil
@@ -470,36 +470,36 @@ materialize_projection_directory() {
   MATERIALIZED_DIR_PATH=""
   MATERIALIZED_DIR_SOURCE="none"
 
-  if [[ -d "${gaeta_dir}" && -d "${opencode_dir}" ]]; then
-    if ! merge_structured_directory_tree "${opencode_dir}" "${gaeta_dir}" "${merged_target_dir}"; then
+  if [[ -d "$gaeta_dir" && -d "$opencode_dir" ]]; then
+    if ! merge_structured_directory_tree "$opencode_dir" "$gaeta_dir" "$merged_target_dir"; then
       error "failed to merge ${dir_name} projection directory"
       return 1
     fi
     MATERIALIZED_DIR_SOURCE="merged"
-    MATERIALIZED_DIR_PATH="${merged_target_dir}"
-  elif [[ -d "${gaeta_dir}" ]]; then
-    rm -rf "${merged_target_dir}"
-    mkdir -p "${merged_target_dir}"
+    MATERIALIZED_DIR_PATH="$merged_target_dir"
+  elif [[ -d "$gaeta_dir" ]]; then
+    rm -rf "$merged_target_dir"
+    mkdir -p "$merged_target_dir"
     cp -a "${gaeta_dir}/." "${merged_target_dir}/"
     MATERIALIZED_DIR_SOURCE="gaeta"
-    MATERIALIZED_DIR_PATH="${merged_target_dir}"
-  elif [[ -d "${opencode_dir}" ]]; then
-    rm -rf "${merged_target_dir}"
-    mkdir -p "${merged_target_dir}"
+    MATERIALIZED_DIR_PATH="$merged_target_dir"
+  elif [[ -d "$opencode_dir" ]]; then
+    rm -rf "$merged_target_dir"
+    mkdir -p "$merged_target_dir"
     cp -a "${opencode_dir}/." "${merged_target_dir}/"
     MATERIALIZED_DIR_SOURCE="opencode"
-    MATERIALIZED_DIR_PATH="${merged_target_dir}"
+    MATERIALIZED_DIR_PATH="$merged_target_dir"
   else
-    rm -rf "${merged_target_dir}"
+    rm -rf "$merged_target_dir"
   fi
 
-  if [[ -n "${MATERIALIZED_DIR_PATH}" && "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
-    rm -rf "${projected_target_dir}"
-    mkdir -p "${projected_target_dir}"
+  if [[ -n "$MATERIALIZED_DIR_PATH" && "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
+    rm -rf "$projected_target_dir"
+    mkdir -p "$projected_target_dir"
     cp -a "${MATERIALIZED_DIR_PATH}/." "${projected_target_dir}/"
-    MATERIALIZED_DIR_PATH="${projected_target_dir}"
+    MATERIALIZED_DIR_PATH="$projected_target_dir"
   elif [[ "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
-    rm -rf "${projected_target_dir}"
+    rm -rf "$projected_target_dir"
   fi
 
   return 0
@@ -511,42 +511,42 @@ materialize_projection_files() {
 
   local source_opencode=""
   local source_tui=""
-  local active_opencode="${selected_opencode}"
-  local active_tui="${selected_tui}"
-  local active_agents="${PROJECTED_AGENTS_DIR}"
-  local active_commands="${PROJECTED_COMMANDS_DIR}"
-  local active_modes="${PROJECTED_MODES_DIR}"
-  local active_plugins="${PROJECTED_PLUGINS_DIR}"
+  local active_opencode="$selected_opencode"
+  local active_tui="$selected_tui"
+  local active_agents="$PROJECTED_AGENTS_DIR"
+  local active_commands="$PROJECTED_COMMANDS_DIR"
+  local active_modes="$PROJECTED_MODES_DIR"
+  local active_plugins="$PROJECTED_PLUGINS_DIR"
 
   if [[ "${GAETA_META_ENABLED:-0}" -ne 1 ]]; then
-    CUSTOM_CONFIG="${active_opencode}"
-    TUI_CONFIG="${active_tui}"
+    CUSTOM_CONFIG="$active_opencode"
+    TUI_CONFIG="$active_tui"
     return 0
   fi
 
-  mkdir -p "${GAETA_PROJECTION_DIR}"
+  mkdir -p "$GAETA_PROJECTION_DIR"
 
-  if [[ -n "${selected_opencode}" && -f "${selected_opencode}" ]]; then
-    source_opencode="${selected_opencode}"
-    if [[ ! -e "${GAETA_PROJECTED_OPENCODE_JSON}" || ! "${selected_opencode}" -ef "${GAETA_PROJECTED_OPENCODE_JSON}" ]]; then
-      cp "${selected_opencode}" "${GAETA_PROJECTED_OPENCODE_JSON}"
+  if [[ -n "$selected_opencode" && -f "$selected_opencode" ]]; then
+    source_opencode="$selected_opencode"
+    if [[ ! -e "$GAETA_PROJECTED_OPENCODE_JSON" || ! "$selected_opencode" -ef "$GAETA_PROJECTED_OPENCODE_JSON" ]]; then
+      cp "$selected_opencode" "$GAETA_PROJECTED_OPENCODE_JSON"
     fi
-    active_opencode="${GAETA_PROJECTED_OPENCODE_JSON}"
+    active_opencode="$GAETA_PROJECTED_OPENCODE_JSON"
   else
-    rm -f "${GAETA_PROJECTED_OPENCODE_JSON}" 2>/dev/null || true
+    rm -f "$GAETA_PROJECTED_OPENCODE_JSON" 2>/dev/null || true
   fi
 
-  if [[ -n "${selected_tui}" && -f "${selected_tui}" ]]; then
-    source_tui="${selected_tui}"
-    if [[ ! -e "${GAETA_PROJECTED_TUI_JSON}" || ! "${selected_tui}" -ef "${GAETA_PROJECTED_TUI_JSON}" ]]; then
-      cp "${selected_tui}" "${GAETA_PROJECTED_TUI_JSON}"
+  if [[ -n "$selected_tui" && -f "$selected_tui" ]]; then
+    source_tui="$selected_tui"
+    if [[ ! -e "$GAETA_PROJECTED_TUI_JSON" || ! "$selected_tui" -ef "$GAETA_PROJECTED_TUI_JSON" ]]; then
+      cp "$selected_tui" "$GAETA_PROJECTED_TUI_JSON"
     fi
-    active_tui="${GAETA_PROJECTED_TUI_JSON}"
+    active_tui="$GAETA_PROJECTED_TUI_JSON"
   else
-    rm -f "${GAETA_PROJECTED_TUI_JSON}" 2>/dev/null || true
+    rm -f "$GAETA_PROJECTED_TUI_JSON" 2>/dev/null || true
   fi
 
-  cat >"${GAETA_PROJECTION_META}" <<EOF
+  cat >"$GAETA_PROJECTION_META" <<EOF
 {
   "timestamp": "$(date -Iseconds)",
   "strategy": "generated projection",
@@ -595,8 +595,8 @@ materialize_projection_files() {
 }
 EOF
 
-  CUSTOM_CONFIG="${active_opencode}"
-  TUI_CONFIG="${active_tui}"
+  CUSTOM_CONFIG="$active_opencode"
+  TUI_CONFIG="$active_tui"
 }
 
 prepare_projection_artifacts() {
@@ -605,44 +605,44 @@ prepare_projection_artifacts() {
   OPENCODE_CACHE="${HOME}/.cache/opencode"
   mkdir -p "${OPENCODE_DATA}/sessions"
   mkdir -p "${OPENCODE_DATA}/permissions"
-  mkdir -p "${OPENCODE_CACHE}"
+  mkdir -p "$OPENCODE_CACHE"
 
   MERGED_CONFIG_DIR="${OPENCODE_CACHE}/gaeta-merged"
-  mkdir -p "${MERGED_CONFIG_DIR}"
+  mkdir -p "$MERGED_CONFIG_DIR"
 
-  if ! CUSTOM_CONFIG=$(select_overlay_config "opencode.json" "${GAETA_CONFIG}" "${OPENCODE_DEFAULT_CONFIG}" "${MERGED_CONFIG_DIR}/opencode.json"); then
+  if ! CUSTOM_CONFIG=$(select_overlay_config "opencode.json" "$GAETA_CONFIG" "$OPENCODE_DEFAULT_CONFIG" "${MERGED_CONFIG_DIR}/opencode.json"); then
     return 1
   fi
 
-  if ! TUI_CONFIG=$(select_overlay_config "tui.json" "${GAETA_TUI_CONFIG}" "${OPENCODE_DEFAULT_TUI_CONFIG}" "${MERGED_CONFIG_DIR}/tui.json"); then
+  if ! TUI_CONFIG=$(select_overlay_config "tui.json" "$GAETA_TUI_CONFIG" "$OPENCODE_DEFAULT_TUI_CONFIG" "${MERGED_CONFIG_DIR}/tui.json"); then
     return 1
   fi
 
-  if ! materialize_projection_directory "agents" "${GAETA_AGENTS_DIR}" "${OPENCODE_AGENTS_DIR}" "${MERGED_CONFIG_DIR}/agents" "${GAETA_PROJECTION_DIR}/agents"; then
+  if ! materialize_projection_directory "agents" "$GAETA_AGENTS_DIR" "$OPENCODE_AGENTS_DIR" "${MERGED_CONFIG_DIR}/agents" "${GAETA_PROJECTION_DIR}/agents"; then
     return 1
   fi
-  PROJECTED_AGENTS_DIR="${MATERIALIZED_DIR_PATH}"
-  PROJECTED_AGENTS_SOURCE="${MATERIALIZED_DIR_SOURCE}"
+  PROJECTED_AGENTS_DIR="$MATERIALIZED_DIR_PATH"
+  PROJECTED_AGENTS_SOURCE="$MATERIALIZED_DIR_SOURCE"
 
-  if ! materialize_projection_directory "commands" "${GAETA_COMMANDS_DIR}" "${OPENCODE_COMMANDS_DIR}" "${MERGED_CONFIG_DIR}/commands" "${GAETA_PROJECTION_DIR}/commands"; then
+  if ! materialize_projection_directory "commands" "$GAETA_COMMANDS_DIR" "$OPENCODE_COMMANDS_DIR" "${MERGED_CONFIG_DIR}/commands" "${GAETA_PROJECTION_DIR}/commands"; then
     return 1
   fi
-  PROJECTED_COMMANDS_DIR="${MATERIALIZED_DIR_PATH}"
-  PROJECTED_COMMANDS_SOURCE="${MATERIALIZED_DIR_SOURCE}"
+  PROJECTED_COMMANDS_DIR="$MATERIALIZED_DIR_PATH"
+  PROJECTED_COMMANDS_SOURCE="$MATERIALIZED_DIR_SOURCE"
 
-  if ! materialize_projection_directory "modes" "${GAETA_MODES_DIR}" "${OPENCODE_MODES_DIR}" "${MERGED_CONFIG_DIR}/modes" "${GAETA_PROJECTION_DIR}/modes"; then
+  if ! materialize_projection_directory "modes" "$GAETA_MODES_DIR" "$OPENCODE_MODES_DIR" "${MERGED_CONFIG_DIR}/modes" "${GAETA_PROJECTION_DIR}/modes"; then
     return 1
   fi
-  PROJECTED_MODES_DIR="${MATERIALIZED_DIR_PATH}"
-  PROJECTED_MODES_SOURCE="${MATERIALIZED_DIR_SOURCE}"
+  PROJECTED_MODES_DIR="$MATERIALIZED_DIR_PATH"
+  PROJECTED_MODES_SOURCE="$MATERIALIZED_DIR_SOURCE"
 
-  if ! materialize_projection_directory "plugins" "${GAETA_PLUGINS_DIR}" "${OPENCODE_PLUGINS_DIR}" "${MERGED_CONFIG_DIR}/plugins" "${GAETA_PROJECTION_DIR}/plugins"; then
+  if ! materialize_projection_directory "plugins" "$GAETA_PLUGINS_DIR" "$OPENCODE_PLUGINS_DIR" "${MERGED_CONFIG_DIR}/plugins" "${GAETA_PROJECTION_DIR}/plugins"; then
     return 1
   fi
-  PROJECTED_PLUGINS_DIR="${MATERIALIZED_DIR_PATH}"
-  PROJECTED_PLUGINS_SOURCE="${MATERIALIZED_DIR_SOURCE}"
+  PROJECTED_PLUGINS_DIR="$MATERIALIZED_DIR_PATH"
+  PROJECTED_PLUGINS_SOURCE="$MATERIALIZED_DIR_SOURCE"
 
-  materialize_projection_files "${CUSTOM_CONFIG}" "${TUI_CONFIG}"
+  materialize_projection_files "$CUSTOM_CONFIG" "$TUI_CONFIG"
   return 0
 }
 
@@ -651,7 +651,7 @@ contains_option() {
   shift
   local arg
   for arg in "$@"; do
-    if [[ "${arg}" == "${needle}" ]]; then
+    if [[ "$arg" == "$needle" ]]; then
       return 0
     fi
   done
@@ -661,7 +661,7 @@ contains_option() {
 has_agent_argument() {
   local arg
   for arg in "$@"; do
-    case "${arg}" in
+    case "$arg" in
       --agent | --agent=*)
         return 0
         ;;
@@ -672,9 +672,9 @@ has_agent_argument() {
 
 apply_default_agent_if_needed() {
   local opencode_bin_name
-  opencode_bin_name=$(basename -- "${OPENCODE_BIN}")
+  opencode_bin_name=$(basename -- "$OPENCODE_BIN")
 
-  case "${opencode_bin_name}" in
+  case "$opencode_bin_name" in
     opencode | opencode-*)
       ;;
     *)
@@ -683,7 +683,7 @@ apply_default_agent_if_needed() {
   esac
 
   local default_agent="${GAETA_DEFAULT_AGENT:-plan}"
-  if [[ -z "${default_agent}" ]]; then
+  if [[ -z "$default_agent" ]]; then
     default_agent="plan"
   fi
 
@@ -691,7 +691,7 @@ apply_default_agent_if_needed() {
     return
   fi
 
-  OPENCODE_ARGS=(--agent "${default_agent}" "${OPENCODE_ARGS[@]}")
+  OPENCODE_ARGS=(--agent "$default_agent" "${OPENCODE_ARGS[@]}")
   info "No --agent provided; defaulting to ${default_agent}"
 }
 
@@ -711,7 +711,7 @@ collect_missing_init_files() {
 
   for rel in "${GAETA_INIT_REQUIRED_FILES[@]}"; do
     if [[ ! -f "${project_dir}/${rel}" ]]; then
-      missing+=("${rel}")
+      missing+=("$rel")
     fi
   done
 
@@ -734,24 +734,24 @@ require_project_initialized() {
   local command_name="$2"
   local missing
 
-  if is_project_initialized "${project_dir}"; then
+  if is_project_initialized "$project_dir"; then
     return 0
   fi
 
   error "${command_name} requires an initialized gaeta project: ${project_dir}"
   error "run: gaeta init \"${project_dir}\""
-  missing=$(collect_missing_init_files "${project_dir}")
-  if [[ -n "${missing}" ]]; then
+  missing=$(collect_missing_init_files "$project_dir")
+  if [[ -n "$missing" ]]; then
     error "missing files:"
     while IFS= read -r line; do
-      [[ -n "${line}" ]] && error "  - ${line}"
-    done <<<"${missing}"
+      [[ -n "$line" ]] && error "  - ${line}"
+    done <<<"$missing"
   fi
   return 1
 }
 
 run_init_command() {
-  local target_project="${PWD}"
+  local target_project="$PWD"
   local force=0
   local -a init_positionals=()
 
@@ -795,7 +795,7 @@ INIT_HELP
     target_project="${init_positionals[0]}"
   fi
 
-  if [[ ! -d "${target_project}" ]]; then
+  if [[ ! -d "$target_project" ]]; then
     error "init project directory does not exist: ${target_project}"
     return 1
   fi
@@ -805,9 +805,9 @@ INIT_HELP
     return 1
   fi
 
-  target_project="$(realpath "${target_project}")"
+  target_project="$(realpath "$target_project")"
 
-  if ! python3 - "${target_project}" "${force}" <<'PY'; then
+  if ! python3 - "$target_project" "$force" <<'PY'
 import pathlib
 import sys
 
@@ -992,6 +992,7 @@ for rel in files:
     action = actions.get(rel, "created")
     print(f"- {action}: {rel}")
 PY
+  then
     error "failed to initialize workflow files"
     return 1
   fi
@@ -1004,12 +1005,12 @@ sync_status_from_checklist() {
   local status_path="$2"
   local trigger="$3"
 
-  if [[ ! -f "${checklist_path}" ]]; then
+  if [[ ! -f "$checklist_path" ]]; then
     warning "workflow sync skipped: checklist not found at ${checklist_path}"
     return 0
   fi
 
-  if [[ ! -f "${status_path}" ]]; then
+  if [[ ! -f "$status_path" ]]; then
     warning "workflow sync skipped: status not found at ${status_path}"
     return 0
   fi
@@ -1019,7 +1020,7 @@ sync_status_from_checklist() {
     return 0
   fi
 
-  if ! python3 - "${checklist_path}" "${status_path}" "${trigger}" <<'PY'; then
+  if ! python3 - "$checklist_path" "$status_path" "$trigger" <<'PY'
 import pathlib
 import re
 import sys
@@ -1080,6 +1081,7 @@ updated = replace_or_append_section(updated, "Next step", next_step_body)
 status_path.write_text(updated, encoding="utf-8")
 print(f"synced status from checklist ({trigger})")
 PY
+  then
     warning "workflow sync failed for ${status_path}"
     return 1
   fi
@@ -1094,17 +1096,17 @@ run_tasks_fallback() {
   shift
 
   local action="${1:-list}"
-  case "${action}" in
+  case "$action" in
     list)
-      if [[ -f "${checklist_path}" ]]; then
-        cat "${checklist_path}"
+      if [[ -f "$checklist_path" ]]; then
+        cat "$checklist_path"
         return 0
       fi
       error "checklist not found: ${checklist_path}"
       return 1
       ;;
     path)
-      printf '%s\n' "${checklist_path}"
+      printf '%s\n' "$checklist_path"
       return 0
       ;;
     add)
@@ -1113,12 +1115,12 @@ run_tasks_fallback() {
         error "fallback usage: gaeta tasks add \"task text\""
         return 1
       fi
-      mkdir -p "$(dirname "${checklist_path}")"
-      if [[ ! -f "${checklist_path}" ]]; then
-        printf '# Checklist\n\n## Current Sprint\n\n' >"${checklist_path}"
+      mkdir -p "$(dirname "$checklist_path")"
+      if [[ ! -f "$checklist_path" ]]; then
+        printf '# Checklist\n\n## Current Sprint\n\n' >"$checklist_path"
       fi
-      printf -- '- [ ] %s\n' "$*" >>"${checklist_path}"
-      sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-fallback-add" || true
+      printf -- '- [ ] %s\n' "$*" >>"$checklist_path"
+      sync_status_from_checklist "$checklist_path" "$status_path" "tasks-fallback-add" || true
       info "added task to ${checklist_path}"
       return 0
       ;;
@@ -1128,7 +1130,7 @@ run_tasks_fallback() {
         error "fallback usage: gaeta tasks done \"task text\""
         return 1
       fi
-      if [[ ! -f "${checklist_path}" ]]; then
+      if [[ ! -f "$checklist_path" ]]; then
         error "checklist not found: ${checklist_path}"
         return 1
       fi
@@ -1136,7 +1138,7 @@ run_tasks_fallback() {
         error "python3 is required for fallback done operation"
         return 1
       fi
-      python3 - "${checklist_path}" "$*" <<'PY'
+      python3 - "$checklist_path" "$*" <<'PY'
 import pathlib
 import re
 import sys
@@ -1162,12 +1164,12 @@ if not updated:
 
 path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 PY
-      sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-fallback-done" || true
+      sync_status_from_checklist "$checklist_path" "$status_path" "tasks-fallback-done" || true
       info "marked matching task as done in ${checklist_path}"
       return 0
       ;;
     sync)
-      sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-fallback-sync"
+      sync_status_from_checklist "$checklist_path" "$status_path" "tasks-fallback-sync"
       return $?
       ;;
     *)
@@ -1187,44 +1189,44 @@ run_tasks_command() {
   local checklist_path="${gaeta_dir}/checklist.md"
   local status_path="${gaeta_dir}/status.md"
 
-  if ! require_project_initialized "${project_dir}" "tasks"; then
+  if ! require_project_initialized "$project_dir" "tasks"; then
     return 1
   fi
 
   if [[ "${task_args[0]:-}" == "sync" ]]; then
-    sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-sync"
+    sync_status_from_checklist "$checklist_path" "$status_path" "tasks-sync"
     return $?
   fi
 
-  if [[ ! -d "${gaeta_dir}" ]]; then
+  if [[ ! -d "$gaeta_dir" ]]; then
     warning "docs/.gaeta not found in ${project_dir}; using fallback mode"
-    run_tasks_fallback "${checklist_path}" "${status_path}" "${task_args[@]}"
+    run_tasks_fallback "$checklist_path" "$status_path" "${task_args[@]}"
     return $?
   fi
 
   if [[ "${GAETA_TASKS_FORCE_FALLBACK:-0}" != "1" ]] && command -v mdt >/dev/null 2>&1; then
     local -a mdt_cmd=(mdt)
     if ! contains_option "--dir" "${task_args[@]}" && ! contains_option "-d" "${task_args[@]}"; then
-      mdt_cmd+=(--dir "${gaeta_dir}")
+      mdt_cmd+=(--dir "$gaeta_dir")
     fi
     if ! contains_option "--inbox" "${task_args[@]}" && ! contains_option "-i" "${task_args[@]}"; then
-      mdt_cmd+=(--inbox "${checklist_path}")
+      mdt_cmd+=(--inbox "$checklist_path")
     fi
     mdt_cmd+=("${task_args[@]}")
     info "Running tasks via mdt in ${gaeta_dir}"
     if ! "${mdt_cmd[@]}"; then
       return 1
     fi
-    sync_status_from_checklist "${checklist_path}" "${status_path}" "tasks-mdt"
+    sync_status_from_checklist "$checklist_path" "$status_path" "tasks-mdt"
     return $?
   fi
 
   warning "mdt unavailable or fallback forced; using built-in fallback tasks mode"
-  run_tasks_fallback "${checklist_path}" "${status_path}" "${task_args[@]}"
+  run_tasks_fallback "$checklist_path" "$status_path" "${task_args[@]}"
 }
 
 run_backup_command() {
-  local target_project="${PWD}"
+  local target_project="$PWD"
   local -a backup_positionals=()
 
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -1255,13 +1257,13 @@ BACKUP_HELP
     target_project="${backup_positionals[0]}"
   fi
 
-  if [[ ! -d "${target_project}" ]]; then
+  if [[ ! -d "$target_project" ]]; then
     error "backup project directory does not exist: ${target_project}"
     return 1
   fi
 
-  target_project="$(realpath "${target_project}")"
-  if ! require_project_initialized "${target_project}" "backup"; then
+  target_project="$(realpath "$target_project")"
+  if ! require_project_initialized "$target_project" "backup"; then
     return 1
   fi
 
@@ -1273,12 +1275,12 @@ BACKUP_HELP
   local backup_dir="${backups_root}/${backup_id}"
   local runtime_log="${target_project}/.gaeta/session.log"
 
-  mkdir -p "${backups_root}"
-  if [[ -e "${backup_dir}" ]]; then
+  mkdir -p "$backups_root"
+  if [[ -e "$backup_dir" ]]; then
     backup_id="${backup_id}-$$"
     backup_dir="${backups_root}/${backup_id}"
   fi
-  mkdir -p "${backup_dir}"
+  mkdir -p "$backup_dir"
 
   local -a required_files=(
     "PROJECT.md"
@@ -1305,56 +1307,56 @@ BACKUP_HELP
   for rel in "${required_files[@]}"; do
     src="${target_project}/${rel}"
     dst="${backup_dir}/${rel}"
-    if [[ ! -f "${src}" ]]; then
+    if [[ ! -f "$src" ]]; then
       error "backup missing required file: ${src}"
       return 1
     fi
-    mkdir -p "$(dirname "${dst}")"
-    cp -p "${src}" "${dst}"
+    mkdir -p "$(dirname "$dst")"
+    cp -p "$src" "$dst"
   done
 
   for rel in "${optional_files[@]}"; do
     src="${target_project}/${rel}"
     dst="${backup_dir}/${rel}"
-    if [[ -f "${src}" ]]; then
-      mkdir -p "$(dirname "${dst}")"
-      cp -p "${src}" "${dst}"
+    if [[ -f "$src" ]]; then
+      mkdir -p "$(dirname "$dst")"
+      cp -p "$src" "$dst"
     fi
   done
 
   {
     printf '# Backup Manifest\n\n'
-    printf -- '- Backup ID: %s\n' "${backup_id}"
-    printf -- '- Generated (UTC): %s\n' "${backup_ts}"
-    printf -- '- Project path: %s\n' "${target_project}"
+    printf -- '- Backup ID: %s\n' "$backup_id"
+    printf -- '- Generated (UTC): %s\n' "$backup_ts"
+    printf -- '- Project path: %s\n' "$target_project"
     printf -- '- Context note: paths are project-relative and do not assume direct host-home visibility.\n\n'
     printf '## Included required files\n\n'
     for rel in "${required_files[@]}"; do
-      printf -- "- \`%s\`\n" "${rel}"
+      printf -- "- \`%s\`\n" "$rel"
     done
     printf '\n## Included optional files\n\n'
     for rel in "${optional_files[@]}"; do
       if [[ -f "${target_project}/${rel}" ]]; then
-        printf -- "- \`%s\`\n" "${rel}"
+        printf -- "- \`%s\`\n" "$rel"
       fi
     done
     printf '\n## Excluded runtime artifacts\n\n'
     for rel in "${excluded_runtime[@]}"; do
-      printf -- "- \`%s\`\n" "${rel}"
+      printf -- "- \`%s\`\n" "$rel"
     done
   } >"${backup_dir}/manifest.md"
 
-  mkdir -p "$(dirname "${runtime_log}")"
-  printf '[%s] backup: wrote docs/.gaeta/backups/%s\n' "$(date -Iseconds)" "${backup_id}" >>"${runtime_log}"
+  mkdir -p "$(dirname "$runtime_log")"
+  printf '[%s] backup: wrote docs/.gaeta/backups/%s\n' "$(date -Iseconds)" "$backup_id" >>"$runtime_log"
 
   info "backup created for project: ${target_project}"
   info "backup directory: ${backup_dir}"
-  printf '%s\n' "${backup_dir}"
+  printf '%s\n' "$backup_dir"
   return 0
 }
 
 run_pause_command() {
-  local target_project="${PWD}"
+  local target_project="$PWD"
   local -a pause_positionals=()
 
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -1384,7 +1386,7 @@ PAUSE_HELP
     target_project="${pause_positionals[0]}"
   fi
 
-  if [[ ! -d "${target_project}" ]]; then
+  if [[ ! -d "$target_project" ]]; then
     error "pause project directory does not exist: ${target_project}"
     return 1
   fi
@@ -1394,9 +1396,9 @@ PAUSE_HELP
     return 1
   fi
 
-  target_project="$(realpath "${target_project}")"
+  target_project="$(realpath "$target_project")"
 
-  if ! require_project_initialized "${target_project}" "pause"; then
+  if ! require_project_initialized "$target_project" "pause"; then
     return 1
   fi
 
@@ -1408,11 +1410,11 @@ PAUSE_HELP
   local project_path="${target_project}/PROJECT.md"
   local runtime_log="${target_project}/.gaeta/session.log"
 
-  if ! sync_status_from_checklist "${checklist_path}" "${status_path}" "pause"; then
+  if ! sync_status_from_checklist "$checklist_path" "$status_path" "pause"; then
     return 1
   fi
 
-  if ! python3 - "${checklist_path}" "${status_path}" "${backlog_path}" "${pause_path}" "${project_path}" <<'PY'; then
+  if ! python3 - "$checklist_path" "$status_path" "$backlog_path" "$pause_path" "$project_path" <<'PY'
 import datetime
 import pathlib
 import re
@@ -1539,19 +1541,20 @@ if project_path.exists():
 
 print(f"wrote {pause_path}")
 PY
+  then
     error "failed to write pause snapshot"
     return 1
   fi
 
-  mkdir -p "$(dirname "${runtime_log}")"
-  printf '[%s] pause: synced status and wrote docs/.gaeta/pause.md\n' "$(date -Iseconds)" >>"${runtime_log}"
+  mkdir -p "$(dirname "$runtime_log")"
+  printf '[%s] pause: synced status and wrote docs/.gaeta/pause.md\n' "$(date -Iseconds)" >>"$runtime_log"
 
   info "pause updated: ${status_path} and ${pause_path}"
   return 0
 }
 
 run_status_command() {
-  local target_project="${PWD}"
+  local target_project="$PWD"
   local -a status_positionals=()
 
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -1582,7 +1585,7 @@ STATUS_HELP
     target_project="${status_positionals[0]}"
   fi
 
-  if [[ ! -d "${target_project}" ]]; then
+  if [[ ! -d "$target_project" ]]; then
     error "status project directory does not exist: ${target_project}"
     return 1
   fi
@@ -1592,16 +1595,16 @@ STATUS_HELP
     return 1
   fi
 
-  target_project="$(realpath "${target_project}")"
+  target_project="$(realpath "$target_project")"
 
-  if ! require_project_initialized "${target_project}" "status"; then
+  if ! require_project_initialized "$target_project" "status"; then
     return 1
   fi
 
   local status_file="${target_project}/docs/.gaeta/status.md"
   local checklist_file="${target_project}/docs/.gaeta/checklist.md"
 
-  if ! python3 - "${target_project}" "${status_file}" "${checklist_file}" <<'PY'; then
+  if ! python3 - "$target_project" "$status_file" "$checklist_file" <<'PY'
 import pathlib
 import re
 import sys
@@ -1674,6 +1677,7 @@ print("  blockers:")
 for row in blocker_rows[:5]:
     print(f"    {row}")
 PY
+  then
     error "failed to render status"
     return 1
   fi
@@ -1682,7 +1686,7 @@ PY
 }
 
 run_go_command() {
-  local target_project="${PWD}"
+  local target_project="$PWD"
   local show_mode=0
   local output_format="user"
   local -a go_positionals=()
@@ -1754,7 +1758,7 @@ GO_HELP
     target_project="${go_positionals[0]}"
   fi
 
-  if [[ ! -d "${target_project}" ]]; then
+  if [[ ! -d "$target_project" ]]; then
     error "go project directory does not exist: ${target_project}"
     return 1
   fi
@@ -1764,8 +1768,8 @@ GO_HELP
     return 1
   fi
 
-  target_project="$(realpath "${target_project}")"
-  if ! require_project_initialized "${target_project}" "go"; then
+  target_project="$(realpath "$target_project")"
+  if ! require_project_initialized "$target_project" "go"; then
     return 1
   fi
 
@@ -1774,7 +1778,7 @@ GO_HELP
   local cycle_file="${target_project}/.gaeta/go-cycle.json"
   local runtime_log="${target_project}/.gaeta/session.log"
 
-  if ! python3 - "${target_project}" "${status_file}" "${checklist_file}" "${cycle_file}" "${runtime_log}" "${output_format}" <<'PY'; then
+  if ! python3 - "$target_project" "$status_file" "$checklist_file" "$cycle_file" "$runtime_log" "$output_format" <<'PY'
 import datetime
 import json
 import pathlib
@@ -1973,15 +1977,16 @@ print(f"  next role in cycle: {next_role}")
 if head_reset:
     print("  rotation note: reset to plan because git HEAD changed.")
 PY
+  then
     error "failed to render go bundle"
     return 1
   fi
 
-  mkdir -p "$(dirname "${runtime_log}")"
-  if [[ "${show_mode}" -eq 1 ]]; then
-    printf '[%s] go: rendered kickoff bundle (show mode)\n' "$(date -Iseconds)" >>"${runtime_log}"
+  mkdir -p "$(dirname "$runtime_log")"
+  if [[ "$show_mode" -eq 1 ]]; then
+    printf '[%s] go: rendered kickoff bundle (show mode)\n' "$(date -Iseconds)" >>"$runtime_log"
   else
-    printf '[%s] go: rendered kickoff bundle\n' "$(date -Iseconds)" >>"${runtime_log}"
+    printf '[%s] go: rendered kickoff bundle\n' "$(date -Iseconds)" >>"$runtime_log"
   fi
 
   return 0
@@ -1991,9 +1996,9 @@ run_proposal_command() {
   local action="${1:-}"
   shift || true
 
-  local target_project="${PWD}"
+  local target_project="$PWD"
 
-  if [[ -z "${action}" || "${action}" == "-h" || "${action}" == "--help" ]]; then
+  if [[ -z "$action" || "$action" == "-h" || "$action" == "--help" ]]; then
     cat <<'PROPOSAL_HELP'
 Usage:
   gaeta proposal create [PROJECT_DIR] "TITLE"
@@ -2010,7 +2015,7 @@ PROPOSAL_HELP
     return 0
   fi
 
-  case "${action}" in
+  case "$action" in
     create)
       if [[ $# -ge 2 && -d "${1}" ]]; then
         target_project="$1"
@@ -2053,7 +2058,7 @@ PROPOSAL_HELP
       ;;
   esac
 
-  if [[ ! -d "${target_project}" ]]; then
+  if [[ ! -d "$target_project" ]]; then
     error "proposal project directory does not exist: ${target_project}"
     return 1
   fi
@@ -2062,15 +2067,15 @@ PROPOSAL_HELP
     return 1
   fi
 
-  target_project="$(realpath "${target_project}")"
-  if ! require_project_initialized "${target_project}" "proposal"; then
+  target_project="$(realpath "$target_project")"
+  if ! require_project_initialized "$target_project" "proposal"; then
     return 1
   fi
   local proposals_dir="${target_project}/docs/.gaeta/proposals"
 
-  if [[ "${action}" == "create" ]]; then
+  if [[ "$action" == "create" ]]; then
     local title="$*"
-    if ! python3 - "${proposals_dir}" "${title}" <<'PY'; then
+    if ! python3 - "$proposals_dir" "$title" <<'PY'
 import datetime
 import pathlib
 import re
@@ -2111,13 +2116,14 @@ proposals_dir.mkdir(parents=True, exist_ok=True)
 proposal_path.write_text(body, encoding="utf-8")
 print(str(proposal_path))
 PY
+    then
       return 1
     fi
     return 0
   fi
 
-  if [[ "${action}" == "list" ]]; then
-    if ! python3 - "${proposals_dir}" <<'PY'; then
+  if [[ "$action" == "list" ]]; then
+    if ! python3 - "$proposals_dir" <<'PY'
 import pathlib
 import re
 import sys
@@ -2141,6 +2147,7 @@ if not rows:
 for name, status in rows:
     print(f"{name}\t{status}")
 PY
+    then
       return 1
     fi
     return 0
@@ -2150,7 +2157,7 @@ PY
   shift || true
   local reject_reason="${*:-Rejected via gaeta proposal reject.}"
 
-  if ! python3 - "${proposals_dir}" "${action}" "${selector}" "${reject_reason}" <<'PY'; then
+  if ! python3 - "$proposals_dir" "$action" "$selector" "$reject_reason" <<'PY'
 import datetime
 import pathlib
 import re
@@ -2235,6 +2242,7 @@ else:
 proposal_path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
 print(str(proposal_path))
 PY
+  then
     return 1
   fi
 
@@ -2245,15 +2253,15 @@ detect_file_source_mode() {
   local gaeta_file="$1"
   local opencode_file="$2"
 
-  if [[ -f "${gaeta_file}" && -f "${opencode_file}" ]]; then
+  if [[ -f "$gaeta_file" && -f "$opencode_file" ]]; then
     printf 'merged'
     return
   fi
-  if [[ -f "${gaeta_file}" ]]; then
+  if [[ -f "$gaeta_file" ]]; then
     printf 'gaeta'
     return
   fi
-  if [[ -f "${opencode_file}" ]]; then
+  if [[ -f "$opencode_file" ]]; then
     printf 'opencode'
     return
   fi
@@ -2264,15 +2272,15 @@ detect_dir_source_mode() {
   local gaeta_dir="$1"
   local opencode_dir="$2"
 
-  if [[ -d "${gaeta_dir}" && -d "${opencode_dir}" ]]; then
+  if [[ -d "$gaeta_dir" && -d "$opencode_dir" ]]; then
     printf 'merged'
     return
   fi
-  if [[ -d "${gaeta_dir}" ]]; then
+  if [[ -d "$gaeta_dir" ]]; then
     printf 'gaeta'
     return
   fi
-  if [[ -d "${opencode_dir}" ]]; then
+  if [[ -d "$opencode_dir" ]]; then
     printf 'opencode'
     return
   fi
@@ -2280,20 +2288,20 @@ detect_dir_source_mode() {
 }
 
 determine_tty_session_mode() {
-  local requested_mode="${GAETA_TTY_MODE_REQUEST}"
+  local requested_mode="$GAETA_TTY_MODE_REQUEST"
 
   TTY_INTERACTIVE=0
   if [[ -t 0 && -t 1 ]]; then
     TTY_INTERACTIVE=1
   fi
 
-  if [[ "${STRICT_TTY}" -eq 1 ]]; then
+  if [[ "$STRICT_TTY" -eq 1 ]]; then
     requested_mode="strict"
   fi
 
-  case "${requested_mode}" in
+  case "$requested_mode" in
     auto)
-      if [[ "${TTY_INTERACTIVE}" -eq 1 ]]; then
+      if [[ "$TTY_INTERACTIVE" -eq 1 ]]; then
         TTY_SESSION_MODE="compat"
         TTY_SESSION_REASON="auto-interactive"
       else
@@ -2326,33 +2334,33 @@ print_doctor_check() {
   normalized_details="${normalized_details//$'\t'/ }"
 
   if [[ "${DOCTOR_COLLECT:-0}" -eq 1 ]]; then
-    DOCTOR_CHECK_ROWS+=("${CURRENT_DOCTOR_SECTION}"$'\t'"${label}"$'\t'"${state}"$'\t'"${normalized_details}")
+    DOCTOR_CHECK_ROWS+=("$CURRENT_DOCTOR_SECTION"$'\t'"$label"$'\t'"$state"$'\t'"$normalized_details")
   fi
 
   if [[ "${DOCTOR_JSON:-0}" -eq 1 ]]; then
     return
   fi
 
-  local state_color="${NC}"
-  case "${state}" in
+  local state_color="$NC"
+  case "$state" in
     ok)
-      state_color="${GREEN}"
+      state_color="$GREEN"
       ;;
     warn)
-      state_color="${YELLOW}"
+      state_color="$YELLOW"
       ;;
     fail)
-      state_color="${RED}"
+      state_color="$RED"
       ;;
   esac
 
   if [[ "${DOCTOR_VERBOSE:-0}" -eq 1 ]]; then
-    printf '  %-22s %b[%s]%b %s\n' "${label}" "${state_color}" "${state}" "${NC}" "${normalized_details}"
+    printf '  %-22s %b[%s]%b %s\n' "$label" "$state_color" "$state" "$NC" "$normalized_details"
     return
   fi
 
-  if [[ "${state}" == "warn" || "${state}" == "fail" ]]; then
-    printf '  %b[%s]%b %s/%s - %s\n' "${state_color}" "${state}" "${NC}" "${CURRENT_DOCTOR_SECTION}" "${label}" "${normalized_details}"
+  if [[ "$state" == "warn" || "$state" == "fail" ]]; then
+    printf '  %b[%s]%b %s/%s - %s\n' "$state_color" "$state" "$NC" "$CURRENT_DOCTOR_SECTION" "$label" "$normalized_details"
   fi
 }
 
@@ -2369,9 +2377,9 @@ render_doctor_json() {
 
   local rows_file
   rows_file="$(mktemp)"
-  printf '%s\n' "${DOCTOR_CHECK_ROWS[@]}" >"${rows_file}"
+  printf '%s\n' "${DOCTOR_CHECK_ROWS[@]}" >"$rows_file"
 
-  python3 - "${target_project}" "${fail_count}" "${warn_count}" "${generated_at}" "${rows_file}" <<'PY'
+  python3 - "$target_project" "$fail_count" "$warn_count" "$generated_at" "$rows_file" <<'PY'
 import json
 import pathlib
 import sys
@@ -2430,11 +2438,11 @@ payload = {
 print(json.dumps(payload, indent=2, ensure_ascii=True))
 PY
 
-  rm -f "${rows_file}"
+  rm -f "$rows_file"
 }
 
 run_doctor_command() {
-  local target_project="${PWD}"
+  local target_project="$PWD"
   local doctor_json_flag=0
   local doctor_verbose_flag=0
   local -a doctor_positionals=()
@@ -2478,17 +2486,17 @@ DOCTOR_HELP
     target_project="${doctor_positionals[0]}"
   fi
 
-  if [[ ! -d "${target_project}" ]]; then
+  if [[ ! -d "$target_project" ]]; then
     error "doctor project directory does not exist: ${target_project}"
     return 1
   fi
 
-  target_project="$(realpath "${target_project}")"
-  PROJECT_DIR="${target_project}"
+  target_project="$(realpath "$target_project")"
+  PROJECT_DIR="$target_project"
 
   init_projection_paths
   GAETA_META_ENABLED=1
-  mkdir -p "${GAETA_PROJECTION_DIR}" 2>/dev/null || true
+  mkdir -p "$GAETA_PROJECTION_DIR" 2>/dev/null || true
 
   local fail_count=0
   local warn_count=0
@@ -2529,12 +2537,12 @@ DOCTOR_HELP
   local modes_mode
   local plugins_mode
 
-  opencode_mode=$(detect_file_source_mode "${gaeta_opencode_json}" "${opencode_opencode_json}")
-  tui_mode=$(detect_file_source_mode "${gaeta_tui_json}" "${opencode_tui_json}")
-  agents_mode=$(detect_dir_source_mode "${gaeta_agents_dir}" "${opencode_agents_dir}")
-  commands_mode=$(detect_dir_source_mode "${gaeta_commands_dir}" "${opencode_commands_dir}")
-  modes_mode=$(detect_dir_source_mode "${gaeta_modes_dir}" "${opencode_modes_dir}")
-  plugins_mode=$(detect_dir_source_mode "${gaeta_plugins_dir}" "${opencode_plugins_dir}")
+  opencode_mode=$(detect_file_source_mode "$gaeta_opencode_json" "$opencode_opencode_json")
+  tui_mode=$(detect_file_source_mode "$gaeta_tui_json" "$opencode_tui_json")
+  agents_mode=$(detect_dir_source_mode "$gaeta_agents_dir" "$opencode_agents_dir")
+  commands_mode=$(detect_dir_source_mode "$gaeta_commands_dir" "$opencode_commands_dir")
+  modes_mode=$(detect_dir_source_mode "$gaeta_modes_dir" "$opencode_modes_dir")
+  plugins_mode=$(detect_dir_source_mode "$gaeta_plugins_dir" "$opencode_plugins_dir")
 
   if ! determine_tty_session_mode; then
     return 1
@@ -2542,27 +2550,27 @@ DOCTOR_HELP
 
   local projection_refresh_state="ok"
   local projection_refresh_details="refreshed projection artifacts"
-  local previous_quiet="${QUIET}"
+  local previous_quiet="$QUIET"
   QUIET=1
   if ! prepare_projection_artifacts; then
     projection_refresh_state="warn"
     projection_refresh_details="failed to refresh projection artifacts"
     ((warn_count += 1))
   fi
-  QUIET="${previous_quiet}"
+  QUIET="$previous_quiet"
 
-  if [[ "${DOCTOR_JSON}" -ne 1 ]]; then
-    if [[ "${DOCTOR_VERBOSE}" -eq 1 ]]; then
-      printf '%bgaeta doctor%b\n' "${BLUE}" "${NC}"
-      printf '  project: %s\n' "${target_project}"
+  if [[ "$DOCTOR_JSON" -ne 1 ]]; then
+    if [[ "$DOCTOR_VERBOSE" -eq 1 ]]; then
+      printf '%bgaeta doctor%b\n' "$BLUE" "$NC"
+      printf '  project: %s\n' "$target_project"
       printf '\n'
     else
-      printf '%bgaeta doctor%b %s\n' "${BLUE}" "${NC}" "${target_project}"
+      printf '%bgaeta doctor%b %s\n' "$BLUE" "$NC" "$target_project"
     fi
   fi
 
   CURRENT_DOCTOR_SECTION="Dependencies"
-  if [[ "${DOCTOR_JSON}" -ne 1 && "${DOCTOR_VERBOSE}" -eq 1 ]]; then
+  if [[ "$DOCTOR_JSON" -ne 1 && "$DOCTOR_VERBOSE" -eq 1 ]]; then
     printf 'Dependencies\n'
   fi
   if command -v bwrap >/dev/null 2>&1; then
@@ -2579,7 +2587,7 @@ DOCTOR_HELP
     ((fail_count += 1))
   fi
 
-  if command -v "${opencode_bin_check}" >/dev/null 2>&1; then
+  if command -v "$opencode_bin_check" >/dev/null 2>&1; then
     print_doctor_check "opencode" "ok" "available as ${opencode_bin_check}"
   else
     print_doctor_check "opencode" "fail" "binary not found: ${opencode_bin_check}"
@@ -2600,7 +2608,7 @@ DOCTOR_HELP
     ((warn_count += 1))
   fi
 
-  if [[ "${DOCTOR_JSON}" -ne 1 && "${DOCTOR_VERBOSE}" -eq 1 ]]; then
+  if [[ "$DOCTOR_JSON" -ne 1 && "$DOCTOR_VERBOSE" -eq 1 ]]; then
     printf '\n'
     printf 'Config Sources\n'
   fi
@@ -2608,7 +2616,7 @@ DOCTOR_HELP
   print_doctor_check "opencode.json" "ok" "mode=${opencode_mode} gaeta=${gaeta_opencode_json} opencode=${opencode_opencode_json}"
   print_doctor_check "tui.json" "ok" "mode=${tui_mode} gaeta=${gaeta_tui_json} opencode=${opencode_tui_json}"
 
-  if [[ "${DOCTOR_JSON}" -ne 1 && "${DOCTOR_VERBOSE}" -eq 1 ]]; then
+  if [[ "$DOCTOR_JSON" -ne 1 && "$DOCTOR_VERBOSE" -eq 1 ]]; then
     printf '\n'
     printf 'Directory Sources\n'
   fi
@@ -2618,22 +2626,22 @@ DOCTOR_HELP
   print_doctor_check "modes" "ok" "mode=${modes_mode} gaeta=${gaeta_modes_dir} opencode=${opencode_modes_dir}"
   print_doctor_check "plugins" "ok" "mode=${plugins_mode} gaeta=${gaeta_plugins_dir} opencode=${opencode_plugins_dir}"
 
-  if [[ "${DOCTOR_JSON}" -ne 1 && "${DOCTOR_VERBOSE}" -eq 1 ]]; then
+  if [[ "$DOCTOR_JSON" -ne 1 && "$DOCTOR_VERBOSE" -eq 1 ]]; then
     printf '\n'
     printf 'Projection Artifacts\n'
   fi
   CURRENT_DOCTOR_SECTION="Projection Artifacts"
-  print_doctor_check "projection refresh" "${projection_refresh_state}" "${projection_refresh_details}"
+  print_doctor_check "projection refresh" "$projection_refresh_state" "$projection_refresh_details"
 
-  if [[ -d "${projection_dir}" ]]; then
-    print_doctor_check "projection dir" "ok" "${projection_dir}"
+  if [[ -d "$projection_dir" ]]; then
+    print_doctor_check "projection dir" "ok" "$projection_dir"
   else
     print_doctor_check "projection dir" "warn" "missing (run gaeta once to generate projection)"
     ((warn_count += 1))
   fi
 
-  if [[ -f "${projection_meta}" ]]; then
-    print_doctor_check "projection.json" "ok" "${projection_meta}"
+  if [[ -f "$projection_meta" ]]; then
+    print_doctor_check "projection.json" "ok" "$projection_meta"
   else
     print_doctor_check "projection.json" "warn" "missing"
     ((warn_count += 1))
@@ -2646,11 +2654,11 @@ DOCTOR_HELP
   local projected_modes_dir="${projection_dir}/modes"
   local projected_plugins_dir="${projection_dir}/plugins"
 
-  if [[ "${opencode_mode}" != "none" && ! -f "${projected_opencode_json}" ]]; then
+  if [[ "$opencode_mode" != "none" && ! -f "$projected_opencode_json" ]]; then
     print_doctor_check "projected opencode" "warn" "expected but missing: ${projected_opencode_json}"
     ((warn_count += 1))
-  elif [[ -f "${projected_opencode_json}" ]]; then
-    print_doctor_check "projected opencode" "ok" "${projected_opencode_json}"
+  elif [[ -f "$projected_opencode_json" ]]; then
+    print_doctor_check "projected opencode" "ok" "$projected_opencode_json"
 
     local core_agent_state="ok"
     local core_agent_details="required core agent profiles present"
@@ -2661,7 +2669,7 @@ DOCTOR_HELP
     else
       local core_agent_check
       if core_agent_check=$(
-        python3 - "${projected_opencode_json}" <<'PY'
+        python3 - "$projected_opencode_json" <<'PY'
 import json
 import pathlib
 import sys
@@ -2693,7 +2701,7 @@ PY
       ); then
         core_agent_state="${core_agent_check%%$'\t'*}"
         core_agent_details="${core_agent_check#*$'\t'}"
-        if [[ "${core_agent_state}" == "warn" ]]; then
+        if [[ "$core_agent_state" == "warn" ]]; then
           ((warn_count += 1))
         fi
       else
@@ -2702,45 +2710,45 @@ PY
         ((warn_count += 1))
       fi
     fi
-    print_doctor_check "core agent profiles" "${core_agent_state}" "${core_agent_details}"
+    print_doctor_check "core agent profiles" "$core_agent_state" "$core_agent_details"
   fi
 
-  if [[ "${tui_mode}" != "none" && ! -f "${projected_tui_json}" ]]; then
+  if [[ "$tui_mode" != "none" && ! -f "$projected_tui_json" ]]; then
     print_doctor_check "projected tui" "warn" "expected but missing: ${projected_tui_json}"
     ((warn_count += 1))
-  elif [[ -f "${projected_tui_json}" ]]; then
-    print_doctor_check "projected tui" "ok" "${projected_tui_json}"
+  elif [[ -f "$projected_tui_json" ]]; then
+    print_doctor_check "projected tui" "ok" "$projected_tui_json"
   fi
 
-  if [[ "${agents_mode}" != "none" && ! -d "${projected_agents_dir}" ]]; then
+  if [[ "$agents_mode" != "none" && ! -d "$projected_agents_dir" ]]; then
     print_doctor_check "projected agents" "warn" "expected but missing: ${projected_agents_dir}"
     ((warn_count += 1))
-  elif [[ -d "${projected_agents_dir}" ]]; then
-    print_doctor_check "projected agents" "ok" "${projected_agents_dir}"
+  elif [[ -d "$projected_agents_dir" ]]; then
+    print_doctor_check "projected agents" "ok" "$projected_agents_dir"
   fi
 
-  if [[ "${commands_mode}" != "none" && ! -d "${projected_commands_dir}" ]]; then
+  if [[ "$commands_mode" != "none" && ! -d "$projected_commands_dir" ]]; then
     print_doctor_check "projected commands" "warn" "expected but missing: ${projected_commands_dir}"
     ((warn_count += 1))
-  elif [[ -d "${projected_commands_dir}" ]]; then
-    print_doctor_check "projected commands" "ok" "${projected_commands_dir}"
+  elif [[ -d "$projected_commands_dir" ]]; then
+    print_doctor_check "projected commands" "ok" "$projected_commands_dir"
   fi
 
-  if [[ "${modes_mode}" != "none" && ! -d "${projected_modes_dir}" ]]; then
+  if [[ "$modes_mode" != "none" && ! -d "$projected_modes_dir" ]]; then
     print_doctor_check "projected modes" "warn" "expected but missing: ${projected_modes_dir}"
     ((warn_count += 1))
-  elif [[ -d "${projected_modes_dir}" ]]; then
-    print_doctor_check "projected modes" "ok" "${projected_modes_dir}"
+  elif [[ -d "$projected_modes_dir" ]]; then
+    print_doctor_check "projected modes" "ok" "$projected_modes_dir"
   fi
 
-  if [[ "${plugins_mode}" != "none" && ! -d "${projected_plugins_dir}" ]]; then
+  if [[ "$plugins_mode" != "none" && ! -d "$projected_plugins_dir" ]]; then
     print_doctor_check "projected plugins" "warn" "expected but missing: ${projected_plugins_dir}"
     ((warn_count += 1))
-  elif [[ -d "${projected_plugins_dir}" ]]; then
-    print_doctor_check "projected plugins" "ok" "${projected_plugins_dir}"
+  elif [[ -d "$projected_plugins_dir" ]]; then
+    print_doctor_check "projected plugins" "ok" "$projected_plugins_dir"
   fi
 
-  if [[ "${DOCTOR_JSON}" -ne 1 && "${DOCTOR_VERBOSE}" -eq 1 ]]; then
+  if [[ "$DOCTOR_JSON" -ne 1 && "$DOCTOR_VERBOSE" -eq 1 ]]; then
     printf '\n'
     printf 'Sandbox Check\n'
   fi
@@ -2750,8 +2758,8 @@ PY
     print_doctor_check "sandbox execution" "ok" "skipped via GAETA_DOCTOR_SKIP_SANDBOX=1"
   elif command -v bwrap >/dev/null 2>&1; then
     local sandbox_output=""
-    if sandbox_output=$("${GAETA_SELF_PATH}" -q -b /bin/bash "${target_project}" -- -lc 'test -d /home/gaeta/.config/opencode && echo GAETA_DOCTOR_SANDBOX_OK' 2>&1); then
-      if [[ "${sandbox_output}" == *"GAETA_DOCTOR_SANDBOX_OK"* ]]; then
+    if sandbox_output=$("$GAETA_SELF_PATH" -q -b /bin/bash "$target_project" -- -lc 'test -d /home/gaeta/.config/opencode && echo GAETA_DOCTOR_SANDBOX_OK' 2>&1); then
+      if [[ "$sandbox_output" == *"GAETA_DOCTOR_SANDBOX_OK"* ]]; then
         print_doctor_check "sandbox execution" "ok" "gaeta launch succeeded in sandbox"
       else
         print_doctor_check "sandbox execution" "warn" "sandbox launched but verification marker missing"
@@ -2773,92 +2781,92 @@ PY
   local workflow_project_md="${target_project}/PROJECT.md"
   local workflow_gaeta_md="${target_project}/GAETA.md"
 
-  if [[ "${DOCTOR_JSON}" -ne 1 && "${DOCTOR_VERBOSE}" -eq 1 ]]; then
+  if [[ "$DOCTOR_JSON" -ne 1 && "$DOCTOR_VERBOSE" -eq 1 ]]; then
     printf '\n'
     printf 'Workflow Files\n'
   fi
   CURRENT_DOCTOR_SECTION="Workflow Files"
-  if [[ -f "${workflow_phases}" ]]; then
-    print_doctor_check "phases.md" "ok" "${workflow_phases}"
+  if [[ -f "$workflow_phases" ]]; then
+    print_doctor_check "phases.md" "ok" "$workflow_phases"
   else
     print_doctor_check "phases.md" "warn" "missing"
     ((warn_count += 1))
   fi
 
-  if [[ -f "${workflow_status}" ]]; then
-    print_doctor_check "status.md" "ok" "${workflow_status}"
+  if [[ -f "$workflow_status" ]]; then
+    print_doctor_check "status.md" "ok" "$workflow_status"
   else
     print_doctor_check "status.md" "warn" "missing"
     ((warn_count += 1))
   fi
 
-  if [[ -f "${workflow_checklist}" ]]; then
-    print_doctor_check "checklist.md" "ok" "${workflow_checklist}"
+  if [[ -f "$workflow_checklist" ]]; then
+    print_doctor_check "checklist.md" "ok" "$workflow_checklist"
   else
     print_doctor_check "checklist.md" "warn" "missing"
     ((warn_count += 1))
   fi
 
-  if [[ -f "${workflow_backlog}" ]]; then
-    print_doctor_check "backlog.md" "ok" "${workflow_backlog}"
+  if [[ -f "$workflow_backlog" ]]; then
+    print_doctor_check "backlog.md" "ok" "$workflow_backlog"
   else
     print_doctor_check "backlog.md" "warn" "missing"
     ((warn_count += 1))
   fi
 
-  if [[ -f "${workflow_project_md}" ]]; then
-    print_doctor_check "PROJECT.md" "ok" "${workflow_project_md}"
+  if [[ -f "$workflow_project_md" ]]; then
+    print_doctor_check "PROJECT.md" "ok" "$workflow_project_md"
   else
     print_doctor_check "PROJECT.md" "warn" "missing"
     ((warn_count += 1))
   fi
 
-  if [[ -f "${workflow_gaeta_md}" ]]; then
-    print_doctor_check "GAETA.md" "ok" "${workflow_gaeta_md}"
+  if [[ -f "$workflow_gaeta_md" ]]; then
+    print_doctor_check "GAETA.md" "ok" "$workflow_gaeta_md"
   else
     print_doctor_check "GAETA.md" "warn" "missing"
     ((warn_count += 1))
   fi
 
-  if is_project_initialized "${target_project}"; then
+  if is_project_initialized "$target_project"; then
     print_doctor_check "init state" "ok" "initialized"
   else
     print_doctor_check "init state" "warn" "not initialized (run: gaeta init \"${target_project}\")"
     ((warn_count += 1))
   fi
 
-  if [[ "${DOCTOR_JSON}" -eq 1 ]]; then
-    if ! render_doctor_json "${target_project}" "${fail_count}" "${warn_count}" "${generated_at}"; then
+  if [[ "$DOCTOR_JSON" -eq 1 ]]; then
+    if ! render_doctor_json "$target_project" "$fail_count" "$warn_count" "$generated_at"; then
       return 1
     fi
   else
-    local summary_color="${GREEN}"
+    local summary_color="$GREEN"
     local summary_label="ok"
-    if [[ "${fail_count}" -gt 0 ]]; then
-      summary_color="${RED}"
+    if [[ "$fail_count" -gt 0 ]]; then
+      summary_color="$RED"
       summary_label="fail"
-    elif [[ "${warn_count}" -gt 0 ]]; then
-      summary_color="${YELLOW}"
+    elif [[ "$warn_count" -gt 0 ]]; then
+      summary_color="$YELLOW"
       summary_label="warn"
     fi
 
-    if [[ "${DOCTOR_VERBOSE}" -eq 1 ]]; then
+    if [[ "$DOCTOR_VERBOSE" -eq 1 ]]; then
       printf '\n'
       printf 'Summary\n'
-      printf '  status=%b%s%b fail=%s warn=%s\n' "${summary_color}" "${summary_label}" "${NC}" "${fail_count}" "${warn_count}"
+      printf '  status=%b%s%b fail=%s warn=%s\n' "$summary_color" "$summary_label" "$NC" "$fail_count" "$warn_count"
     else
-      printf '  summary: %b%s%b fail=%s warn=%s\n' "${summary_color}" "${summary_label}" "${NC}" "${fail_count}" "${warn_count}"
+      printf '  summary: %b%s%b fail=%s warn=%s\n' "$summary_color" "$summary_label" "$NC" "$fail_count" "$warn_count"
     fi
   fi
 
-  if [[ "${fail_count}" -gt 0 ]]; then
+  if [[ "$fail_count" -gt 0 ]]; then
     return 1
   fi
   return 0
 }
 
 run_resume_command() {
-  local target_project="${PWD}"
+  local target_project="$PWD"
   local show_only=0
   local project_file
   local status_file
@@ -2889,7 +2897,7 @@ RESUME_HELP
         shift
         ;;
       *)
-        if [[ "${target_project}" != "${PWD}" ]]; then
+        if [[ "$target_project" != "$PWD" ]]; then
           error "resume accepts at most one optional PROJECT_DIR"
           return 1
         fi
@@ -2899,13 +2907,13 @@ RESUME_HELP
     esac
   done
 
-  if [[ ! -d "${target_project}" ]]; then
+  if [[ ! -d "$target_project" ]]; then
     error "resume project directory does not exist: ${target_project}"
     return 1
   fi
 
-  target_project="$(realpath "${target_project}")"
-  if ! require_project_initialized "${target_project}" "resume"; then
+  target_project="$(realpath "$target_project")"
+  if ! require_project_initialized "$target_project" "resume"; then
     return 1
   fi
   status_file="${target_project}/docs/.gaeta/status.md"
@@ -2919,7 +2927,7 @@ RESUME_HELP
   fi
 
   resume_prompt=$(
-    python3 - "${project_file}" "${status_file}" "${checklist_file}" "${pause_file}" <<'PY'
+    python3 - "$project_file" "$status_file" "$checklist_file" "$pause_file" <<'PY'
 import pathlib
 import re
 import sys
@@ -3016,7 +3024,7 @@ print(resume_prompt)
 PY
   )
 
-  if [[ -z "${resume_prompt}" ]]; then
+  if [[ -z "$resume_prompt" ]]; then
     error "failed to resolve resume prompt"
     return 1
   fi
@@ -3024,41 +3032,41 @@ PY
   opencode_bin="${OPENCODE_BIN:-${OPENCODE_BIN_DEFAULT}}"
   resume_agent="${GAETA_RESUME_AGENT:-plan}"
 
-  if [[ -z "${resume_agent}" ]]; then
+  if [[ -z "$resume_agent" ]]; then
     resume_agent="plan"
   fi
 
-  if [[ "${show_only}" -eq 1 ]]; then
+  if [[ "$show_only" -eq 1 ]]; then
     printf 'gaeta resume\n'
-    printf '  project: %s\n' "${target_project}"
-    printf '  opencode: %s\n' "${opencode_bin}"
-    printf '  agent: %s\n' "${resume_agent}"
-    printf '  launch: %s %s -- --agent %s --prompt "%s"\n' "${GAETA_SELF_PATH}" "${target_project}" "${resume_agent}" "${resume_prompt}"
-    printf '\nResume prompt\n  %s\n' "${resume_prompt}"
+    printf '  project: %s\n' "$target_project"
+    printf '  opencode: %s\n' "$opencode_bin"
+    printf '  agent: %s\n' "$resume_agent"
+    printf '  launch: %s %s -- --agent %s --prompt "%s"\n' "$GAETA_SELF_PATH" "$target_project" "$resume_agent" "$resume_prompt"
+    printf '\nResume prompt\n  %s\n' "$resume_prompt"
     return 0
   fi
 
-  exec "${GAETA_SELF_PATH}" "${target_project}" -- --agent "${resume_agent}" --prompt "${resume_prompt}"
+  exec "$GAETA_SELF_PATH" "$target_project" -- --agent "$resume_agent" --prompt "$resume_prompt"
 }
 
 update_phase() {
   local phase="$1"
   if [[ "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
-    printf '%s\n' "${phase}" >"${GAETA_PHASE_FILE}" || true
+    printf '%s\n' "$phase" >"$GAETA_PHASE_FILE" || true
   fi
 }
 
 append_session_log() {
   local message="$1"
   if [[ "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
-    printf '[%s] %s\n' "$(date -Iseconds)" "${message}" >>"${GAETA_SESSION_LOG}" || true
+    printf '[%s] %s\n' "$(date -Iseconds)" "$message" >>"$GAETA_SESSION_LOG" || true
   fi
 }
 
 append_approval_log() {
   local message="$1"
   if [[ "${GAETA_META_ENABLED:-0}" -eq 1 ]]; then
-    printf '[%s] %s\n' "$(date -Iseconds)" "${message}" >>"${GAETA_APPROVAL_LOG}" || true
+    printf '[%s] %s\n' "$(date -Iseconds)" "$message" >>"$GAETA_APPROVAL_LOG" || true
   fi
 }
 
@@ -3074,21 +3082,21 @@ write_command_json() {
   local cmd_json
   local args_json=""
   local index=0
-  project_json=$(json_escape "${PROJECT_DIR}")
-  mode_json=$(json_escape "${mode}")
-  cmd_json=$(json_escape "${command_path}")
+  project_json=$(json_escape "$PROJECT_DIR")
+  mode_json=$(json_escape "$mode")
+  cmd_json=$(json_escape "$command_path")
 
   for arg in "${OPENCODE_ARGS[@]}"; do
     local escaped
-    escaped=$(json_escape "${arg}")
-    if [[ "${index}" -gt 0 ]]; then
+    escaped=$(json_escape "$arg")
+    if [[ "$index" -gt 0 ]]; then
       args_json+=$',\n'
     fi
     args_json+="    \"${escaped}\""
     ((index += 1))
   done
 
-  cat >"${GAETA_COMMAND_JSON}" <<EOF
+  cat >"$GAETA_COMMAND_JSON" <<EOF
 {
   "timestamp": "$(date -Iseconds)",
   "project_dir": "${project_json}",
@@ -3123,12 +3131,12 @@ init_metadata_dir() {
   GAETA_COMMAND_JSON="${GAETA_META_DIR}/command.json"
   GAETA_APPROVAL_LOG="${GAETA_META_DIR}/approval.log"
 
-  if mkdir -p "${GAETA_META_DIR}" 2>/dev/null; then
+  if mkdir -p "$GAETA_META_DIR" 2>/dev/null; then
     GAETA_META_ENABLED=1
-    : >"${GAETA_PHASE_FILE}" || true
-    : >"${GAETA_COMMAND_JSON}" || true
-    touch "${GAETA_SESSION_LOG}" "${GAETA_APPROVAL_LOG}" 2>/dev/null || true
-    mkdir -p "${GAETA_PROJECTION_DIR}" 2>/dev/null || true
+    : >"$GAETA_PHASE_FILE" || true
+    : >"$GAETA_COMMAND_JSON" || true
+    touch "$GAETA_SESSION_LOG" "$GAETA_APPROVAL_LOG" 2>/dev/null || true
+    mkdir -p "$GAETA_PROJECTION_DIR" 2>/dev/null || true
   else
     warning "cannot write metadata in ${GAETA_META_DIR}"
   fi
@@ -3154,14 +3162,14 @@ detect_landrun() {
 }
 
 check_landlock_support() {
-  if [[ "${LANDRUN_AVAILABLE}" -eq 1 && "${LANDLOCK_ABI_VERSION}" -eq 0 ]]; then
-    if [[ "${REQUIRE_LANDLOCK}" -eq 1 ]]; then
+  if [[ "$LANDRUN_AVAILABLE" -eq 1 && "$LANDLOCK_ABI_VERSION" -eq 0 ]]; then
+    if [[ "$REQUIRE_LANDLOCK" -eq 1 ]]; then
       error "landrun found but kernel doesn't support Landlock"
       error "Kernel 5.13+ with CONFIG_SECURITY_LANDLOCK=y is required"
       return 2
     fi
 
-    if [[ "${QUIET_LANDLOCK}" -eq 0 ]]; then
+    if [[ "$QUIET_LANDLOCK" -eq 0 ]]; then
       warning "landrun found but kernel doesn't support Landlock"
       warning "Kernel 5.13+ required with CONFIG_SECURITY_LANDLOCK=y"
       warning "Falling back to bubblewrap-only mode"
@@ -3169,7 +3177,7 @@ check_landlock_support() {
     return 1
   fi
 
-  if [[ "${LANDLOCK_ABI_VERSION}" -gt 0 && "${LANDLOCK_ABI_VERSION}" -lt 4 && "${QUIET_LANDLOCK}" -eq 0 ]]; then
+  if [[ "$LANDLOCK_ABI_VERSION" -gt 0 && "$LANDLOCK_ABI_VERSION" -lt 4 && "$QUIET_LANDLOCK" -eq 0 ]]; then
     info_blue "Note: Landlock ABI v${LANDLOCK_ABI_VERSION} detected (kernel < 6.7)"
     info_blue "Network syscall restrictions unavailable (requires ABI v4+)"
   fi
@@ -3197,35 +3205,35 @@ translate_paths_to_landrun() {
   [[ -d /proc ]] && LANDRUN_PATH_RULES+=(--ro /proc)
 
   # OpenCode data/cache (read-write with execution for binaries)
-  LANDRUN_PATH_RULES+=(--rwx "${OPENCODE_DATA}")
-  LANDRUN_PATH_RULES+=(--rwx "${OPENCODE_CACHE}")
+  LANDRUN_PATH_RULES+=(--rwx "$OPENCODE_DATA")
+  LANDRUN_PATH_RULES+=(--rwx "$OPENCODE_CACHE")
 
   # Config files (if they exist)
-  if [[ -n "${CUSTOM_CONFIG}" && -f "${CUSTOM_CONFIG}" ]]; then
-    LANDRUN_PATH_RULES+=(--ro "${CUSTOM_CONFIG}")
+  if [[ -n "$CUSTOM_CONFIG" && -f "$CUSTOM_CONFIG" ]]; then
+    LANDRUN_PATH_RULES+=(--ro "$CUSTOM_CONFIG")
   fi
-  if [[ -n "${TUI_CONFIG}" && -f "${TUI_CONFIG}" ]]; then
-    LANDRUN_PATH_RULES+=(--ro "${TUI_CONFIG}")
+  if [[ -n "$TUI_CONFIG" && -f "$TUI_CONFIG" ]]; then
+    LANDRUN_PATH_RULES+=(--ro "$TUI_CONFIG")
   fi
 
   # Project directory (depends on FS_MODE)
-  if [[ "${FS_MODE}" = "ro" ]]; then
-    LANDRUN_PATH_RULES+=(--ro "${PROJECT_DIR}")
+  if [[ "$FS_MODE" = "ro" ]]; then
+    LANDRUN_PATH_RULES+=(--ro "$PROJECT_DIR")
   else
-    LANDRUN_PATH_RULES+=(--rwx "${PROJECT_DIR}")
+    LANDRUN_PATH_RULES+=(--rwx "$PROJECT_DIR")
   fi
 
   # Protected infrastructure (read-only overlays)
-  if [[ "${ALLOW_INFRA}" -eq 0 ]]; then
+  if [[ "$ALLOW_INFRA" -eq 0 ]]; then
     for dir in "${PROTECTED_INFRA_DIRS[@]}"; do
       local skip=0
-      [[ "${dir}" == ".git" && "${ALLOW_GIT}" -eq 1 ]] && skip=1
-      [[ "${dir}" == "node_modules" && "${ALLOW_NODE_MODULES}" -eq 1 ]] && skip=1
-      [[ "${dir}" == ".venv" && "${ALLOW_VENV}" -eq 1 ]] && skip=1
+      [[ "$dir" == ".git" && "$ALLOW_GIT" -eq 1 ]] && skip=1
+      [[ "$dir" == "node_modules" && "$ALLOW_NODE_MODULES" -eq 1 ]] && skip=1
+      [[ "$dir" == ".venv" && "$ALLOW_VENV" -eq 1 ]] && skip=1
 
-      if [[ "${skip}" -eq 0 && -d "${PROJECT_DIR}/${dir}" ]]; then
+      if [[ "$skip" -eq 0 && -d "${PROJECT_DIR}/${dir}" ]]; then
         # node_modules and .venv may contain executables
-        if [[ "${dir}" == "node_modules" || "${dir}" == ".venv" ]]; then
+        if [[ "$dir" == "node_modules" || "$dir" == ".venv" ]]; then
           LANDRUN_PATH_RULES+=(--rox "${PROJECT_DIR}/${dir}")
         else
           LANDRUN_PATH_RULES+=(--ro "${PROJECT_DIR}/${dir}")
@@ -3241,7 +3249,7 @@ translate_paths_to_landrun() {
   fi
 
   # Host tools (if bound)
-  if [[ "${ALLOW_HOST_TOOLS}" -eq 1 ]]; then
+  if [[ "$ALLOW_HOST_TOOLS" -eq 1 ]]; then
     [[ -d "${HOME}/.local/bin" ]] && LANDRUN_PATH_RULES+=(--rox "${HOME}/.local/bin")
     [[ -d "${HOME}/.local/share/mise" ]] && LANDRUN_PATH_RULES+=(--rox "${HOME}/.local/share/mise")
     [[ -d "${HOME}/.local/share/uv" ]] && LANDRUN_PATH_RULES+=(--rox "${HOME}/.local/share/uv")
@@ -3270,9 +3278,9 @@ translate_network_to_landrun() {
 
   # If network is enabled, allow unrestricted network
   # If disabled, don't add any flags (landrun default is deny)
-  if [[ "${NET_MODE}" == "on" ]]; then
+  if [[ "$NET_MODE" == "on" ]]; then
     # Only add network flags if kernel supports it (ABI v4+)
-    if [[ "${LANDLOCK_ABI_VERSION}" -ge 4 ]]; then
+    if [[ "$LANDLOCK_ABI_VERSION" -ge 4 ]]; then
       LANDRUN_NET_RULES+=(--unrestricted-network)
     else
       # Older kernels don't support network restrictions
@@ -3286,16 +3294,15 @@ translate_network_to_landrun() {
 # ====== PARANOID MODE: Execution Orchestration ======
 
 build_landrun_command() {
-  local -n bwrap_cmd_ref=$1
   LANDRUN_CMD=()
 
-  LANDRUN_CMD+=("${LANDRUN_BIN}")
+  LANDRUN_CMD+=("$LANDRUN_BIN")
 
   # Add automatic library dependency detection
   LANDRUN_CMD+=(--ldd)
 
   # Add automatic executable detection for opencode
-  LANDRUN_CMD+=(--add-exec "${OPENCODE_BIN}")
+  LANDRUN_CMD+=(--add-exec "$OPENCODE_BIN")
 
   # Add translated path rules
   LANDRUN_CMD+=("${LANDRUN_PATH_RULES[@]}")
@@ -3309,7 +3316,7 @@ build_landrun_command() {
   LANDRUN_CMD+=(--)
 
   # Add entire bubblewrap command as child process
-  LANDRUN_CMD+=("${bwrap_cmd_ref[@]}")
+  LANDRUN_CMD+=("${BWRAP_CMD[@]}")
 }
 
 run_validation() {
@@ -3320,7 +3327,7 @@ run_validation() {
   info "=== Running gaeta comprehensive validation tests ==="
 
   # Setup test project
-  mkdir -p "${test_project}"/{.git,node_modules,.venv/bin}
+  mkdir -p "$test_project"/{.git,node_modules,.venv/bin}
   echo "test content" >"${test_project}/test.py"
   echo '#!/bin/bash' >"${test_project}/.venv/bin/python"
   chmod +x "${test_project}/.venv/bin/python"
@@ -3330,8 +3337,8 @@ run_validation() {
   info "Test A.1: HOME isolation"
   local home_result
   # shellcheck disable=SC2016
-  home_result=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'echo "$HOME"' 2>&1 || true)
-  if [[ "${home_result}" == "/home/gaeta" ]]; then
+  home_result=$("$script_path" -q "$test_project" -- /bin/bash -c 'echo "$HOME"' 2>&1 || true)
+  if [[ "$home_result" == "/home/gaeta" ]]; then
     echo "✅ Test A.1 PASS: HOME is /home/gaeta (isolated)"
   else
     echo "❌ Test A.1 FAIL: HOME is ${home_result} (expected /home/gaeta)"
@@ -3341,14 +3348,14 @@ run_validation() {
   # Test A.2: bashrc write isolation (no leak to host)
   info "Test A.2: ~/.bashrc write isolation"
   local host_bashrc="${HOME}/.bashrc"
-  "${script_path}" -q "${test_project}" -- /bin/bash -c 'echo "GAETA_TEST" > ~/.bashrc' >/dev/null 2>&1 || true
+  "$script_path" -q "$test_project" -- /bin/bash -c 'echo "GAETA_TEST" > ~/.bashrc' >/dev/null 2>&1 || true
   local leaked=0
-  if [[ -f "${host_bashrc}" ]]; then
-    if grep -q "GAETA_TEST" "${host_bashrc}" 2>/dev/null; then
+  if [[ -f "$host_bashrc" ]]; then
+    if grep -q "GAETA_TEST" "$host_bashrc" 2>/dev/null; then
       leaked=1
     fi
   fi
-  if [[ "${leaked}" -eq 0 ]]; then
+  if [[ "$leaked" -eq 0 ]]; then
     echo "✅ Test A.2 PASS: ~/.bashrc writes do not leak to host"
   else
     echo "❌ Test A.2 FAIL: ~/.bashrc writes leaked to host"
@@ -3358,8 +3365,8 @@ run_validation() {
   # Test A.3: System file write protection
   info "Test A.3: System file write protection"
   local sys_write
-  sys_write=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'touch /usr/bin/gaeta-test 2>&1' 2>&1 || true)
-  if echo "${sys_write}" | grep -qE "Read-only|Permission denied|cannot touch"; then
+  sys_write=$("$script_path" -q "$test_project" -- /bin/bash -c 'touch /usr/bin/gaeta-test 2>&1' 2>&1 || true)
+  if echo "$sys_write" | grep -qE "Read-only|Permission denied|cannot touch"; then
     echo "✅ Test A.3 PASS: System files are read-only"
   else
     echo "❌ Test A.3 FAIL: System files are writable"
@@ -3369,8 +3376,8 @@ run_validation() {
   # Test B.1: Workspace is writable
   info "Test B.1: Workspace writability"
   local workspace_write
-  workspace_write=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'touch new_file.py && echo SUCCESS' 2>&1 || true)
-  if echo "${workspace_write}" | grep -q "SUCCESS"; then
+  workspace_write=$("$script_path" -q "$test_project" -- /bin/bash -c 'touch new_file.py && echo SUCCESS' 2>&1 || true)
+  if echo "$workspace_write" | grep -q "SUCCESS"; then
     echo "✅ Test B.1 PASS: Workspace is writable"
   else
     echo "❌ Test B.1 FAIL: Cannot write to workspace"
@@ -3380,8 +3387,8 @@ run_validation() {
   # Test B.2: .git protection
   info "Test B.2: .git directory protection"
   local git_write
-  git_write=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'touch .git/test 2>&1' 2>&1 || true)
-  if echo "${git_write}" | grep -qE "Read-only|Permission denied|cannot touch"; then
+  git_write=$("$script_path" -q "$test_project" -- /bin/bash -c 'touch .git/test 2>&1' 2>&1 || true)
+  if echo "$git_write" | grep -qE "Read-only|Permission denied|cannot touch"; then
     echo "✅ Test B.2 PASS: .git is read-only"
   else
     echo "❌ Test B.2 FAIL: .git is writable"
@@ -3391,8 +3398,8 @@ run_validation() {
   # Test B.3: node_modules protection
   info "Test B.3: node_modules directory protection"
   local nm_write
-  nm_write=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'touch node_modules/test 2>&1' 2>&1 || true)
-  if echo "${nm_write}" | grep -qE "Read-only|Permission denied|cannot touch"; then
+  nm_write=$("$script_path" -q "$test_project" -- /bin/bash -c 'touch node_modules/test 2>&1' 2>&1 || true)
+  if echo "$nm_write" | grep -qE "Read-only|Permission denied|cannot touch"; then
     echo "✅ Test B.3 PASS: node_modules is read-only"
   else
     echo "❌ Test B.3 FAIL: node_modules is writable"
@@ -3402,8 +3409,8 @@ run_validation() {
   # Test B.4: --allow-git override
   info "Test B.4: --allow-git override functionality"
   local git_override
-  git_override=$("${script_path}" -q --allow-git "${test_project}" -- /bin/bash -c 'touch .git/test && echo SUCCESS' 2>&1 || true)
-  if echo "${git_override}" | grep -q "SUCCESS"; then
+  git_override=$("$script_path" -q --allow-git "$test_project" -- /bin/bash -c 'touch .git/test && echo SUCCESS' 2>&1 || true)
+  if echo "$git_override" | grep -q "SUCCESS"; then
     echo "✅ Test B.4 PASS: --allow-git override works"
   else
     echo "❌ Test B.4 FAIL: --allow-git override failed"
@@ -3411,27 +3418,27 @@ run_validation() {
   fi
 
   # Test C: Config overlay (gaeta precedence with key-level merge)
-  if [[ -f "${GAETA_CONFIG}" || -f "${OPENCODE_DEFAULT_CONFIG}" ]]; then
+  if [[ -f "$GAETA_CONFIG" || -f "$OPENCODE_DEFAULT_CONFIG" ]]; then
     info "Test C: Config overlay verification"
     local config_read
-    config_read=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'cat ~/.config/opencode/opencode.json 2>&1' 2>&1 || true)
+    config_read=$("$script_path" -q "$test_project" -- /bin/bash -c 'cat ~/.config/opencode/opencode.json 2>&1' 2>&1 || true)
     local expected_content
-    if [[ -f "${GAETA_CONFIG}" && -f "${OPENCODE_DEFAULT_CONFIG}" ]]; then
+    if [[ -f "$GAETA_CONFIG" && -f "$OPENCODE_DEFAULT_CONFIG" ]]; then
       local merged_expected
       merged_expected="/tmp/gaeta-validation-merged-opencode-$$.json"
-      if merge_structured_config_files "${OPENCODE_DEFAULT_CONFIG}" "${GAETA_CONFIG}" "${merged_expected}"; then
-        expected_content=$(cat "${merged_expected}" 2>/dev/null || echo "")
-        rm -f "${merged_expected}"
+      if merge_structured_config_files "$OPENCODE_DEFAULT_CONFIG" "$GAETA_CONFIG" "$merged_expected"; then
+        expected_content=$(cat "$merged_expected" 2>/dev/null || echo "")
+        rm -f "$merged_expected"
       else
         expected_content=""
       fi
-    elif [[ -f "${GAETA_CONFIG}" ]]; then
-      expected_content=$(cat "${GAETA_CONFIG}" 2>/dev/null || echo "")
+    elif [[ -f "$GAETA_CONFIG" ]]; then
+      expected_content=$(cat "$GAETA_CONFIG" 2>/dev/null || echo "")
     else
-      expected_content=$(cat "${OPENCODE_DEFAULT_CONFIG}" 2>/dev/null || echo "")
+      expected_content=$(cat "$OPENCODE_DEFAULT_CONFIG" 2>/dev/null || echo "")
     fi
 
-    if [[ "${config_read}" == "${expected_content}" ]]; then
+    if [[ "$config_read" == "$expected_content" ]]; then
       echo "✅ Test C PASS: Config overlay works with gaeta precedence"
     else
       echo "❌ Test C FAIL: Config overlay mismatch"
@@ -3445,8 +3452,8 @@ run_validation() {
   info "Test D: .venv in PATH"
   local venv_path
   # shellcheck disable=SC2016
-  venv_path=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'echo "$PATH"' 2>&1 || true)
-  if echo "${venv_path}" | grep -q ".venv/bin"; then
+  venv_path=$("$script_path" -q "$test_project" -- /bin/bash -c 'echo "$PATH"' 2>&1 || true)
+  if echo "$venv_path" | grep -q ".venv/bin"; then
     echo "✅ Test D PASS: .venv/bin is in PATH"
   else
     echo "❌ Test D FAIL: .venv/bin not in PATH"
@@ -3456,8 +3463,8 @@ run_validation() {
   # Test E: Network restriction
   info "Test E: Network restriction with --no-net"
   local net_test
-  net_test=$("${script_path}" -q -n "${test_project}" -- /bin/bash -c 'ping -c 1 -W 1 8.8.8.8 2>&1' 2>&1 || true)
-  if echo "${net_test}" | grep -qE "Network is unreachable|Name or service not known|Invalid argument"; then
+  net_test=$("$script_path" -q -n "$test_project" -- /bin/bash -c 'ping -c 1 -W 1 8.8.8.8 2>&1' 2>&1 || true)
+  if echo "$net_test" | grep -qE "Network is unreachable|Name or service not known|Invalid argument"; then
     echo "✅ Test E PASS: Network restriction works"
   else
     echo "❌ Test E FAIL: Network not restricted"
@@ -3465,15 +3472,15 @@ run_validation() {
   fi
 
   # ====== PARANOID MODE TESTS ======
-  if [[ "${LANDRUN_AVAILABLE}" -eq 1 && "${LANDLOCK_ABI_VERSION}" -gt 0 ]]; then
+  if [[ "$LANDRUN_AVAILABLE" -eq 1 && "$LANDLOCK_ABI_VERSION" -gt 0 ]]; then
     echo ""
     info "=== Paranoid Mode Tests (Landlock + Bubblewrap) ==="
 
     # Test G.1: Verify landrun is invoked in paranoid mode
     info "Test G.1: Paranoid mode execution"
     local paranoid_test
-    paranoid_test=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'echo INSIDE' 2>&1 || true)
-    if echo "${paranoid_test}" | grep -q "INSIDE"; then
+    paranoid_test=$("$script_path" -q "$test_project" -- /bin/bash -c 'echo INSIDE' 2>&1 || true)
+    if echo "$paranoid_test" | grep -q "INSIDE"; then
       echo "✅ Test G.1 PASS: Paranoid mode executes successfully"
     else
       echo "❌ Test G.1 FAIL: Paranoid mode execution failed"
@@ -3483,8 +3490,8 @@ run_validation() {
     # Test G.3: Verify --not-paranoid successfully disables landrun
     info "Test G.3: --not-paranoid opt-out"
     local non_paranoid_test
-    non_paranoid_test=$("${script_path}" -q --not-paranoid "${test_project}" -- /bin/bash -c 'echo INSIDE' 2>&1 || true)
-    if echo "${non_paranoid_test}" | grep -q "INSIDE"; then
+    non_paranoid_test=$("$script_path" -q --not-paranoid "$test_project" -- /bin/bash -c 'echo INSIDE' 2>&1 || true)
+    if echo "$non_paranoid_test" | grep -q "INSIDE"; then
       echo "✅ Test G.3 PASS: --not-paranoid mode works"
     else
       echo "❌ Test G.3 FAIL: --not-paranoid mode failed"
@@ -3494,8 +3501,8 @@ run_validation() {
     # Test G.2: Syscall enforcement (attempt to write to protected file)
     info "Test G.2: Syscall-level protection verification"
     local syscall_test
-    syscall_test=$("${script_path}" -q "${test_project}" -- /bin/bash -c 'echo test > /etc/gaeta-test 2>&1' 2>&1 || true)
-    if echo "${syscall_test}" | grep -qE "Permission denied|Read-only|cannot create"; then
+    syscall_test=$("$script_path" -q "$test_project" -- /bin/bash -c 'echo test > /etc/gaeta-test 2>&1' 2>&1 || true)
+    if echo "$syscall_test" | grep -qE "Permission denied|Read-only|cannot create"; then
       echo "✅ Test G.2 PASS: Syscall-level protection active"
     else
       echo "❌ Test G.2 FAIL: Syscall protection not working"
@@ -3504,20 +3511,20 @@ run_validation() {
   else
     echo ""
     info "=== Paranoid Mode Tests: SKIPPED ==="
-    if [[ "${LANDRUN_AVAILABLE}" -eq 0 ]]; then
+    if [[ "$LANDRUN_AVAILABLE" -eq 0 ]]; then
       echo "ℹ️  landrun not found in PATH"
       echo "ℹ️  Install landrun to enable paranoid mode tests"
       echo "ℹ️  See: https://github.com/landlock-lsm/landlock"
-    elif [[ "${LANDLOCK_ABI_VERSION}" -eq 0 ]]; then
+    elif [[ "$LANDLOCK_ABI_VERSION" -eq 0 ]]; then
       echo "ℹ️  Kernel doesn't support Landlock (need 5.13+ with CONFIG_SECURITY_LANDLOCK=y)"
     fi
   fi
 
   # Cleanup
-  rm -rf "${test_project}"
+  rm -rf "$test_project"
 
   echo ""
-  if [[ "${failed_tests}" -eq 0 ]]; then
+  if [[ "$failed_tests" -eq 0 ]]; then
     echo "🎉 All validation tests passed!"
     return 0
   else
@@ -3538,7 +3545,7 @@ ALLOW_HOST_TOOLS_DISABLE_SET=0
 NOT_PARANOID=0
 QUIET_LANDLOCK=0
 REQUIRE_LANDLOCK=0
-HOST_HOME="${HOME}"
+HOST_HOME="$HOME"
 STRICT_TTY=0
 GAETA_TTY_MODE_REQUEST="${GAETA_TTY_MODE:-auto}"
 TTY_SESSION_MODE="strict"
@@ -3635,7 +3642,7 @@ fi
 # Command dispatch: gaeta tasks ...
 if [[ "${1:-}" == "tasks" ]]; then
   shift
-  if ! run_tasks_command "${PWD}" "$@"; then
+  if ! run_tasks_command "$PWD" "$@"; then
     exit 1
   fi
   exit 0
@@ -3670,7 +3677,7 @@ RESTRICT_DEV=0
 PARSE_DONE=0
 
 while [[ $# -gt 0 ]]; do
-  if [[ "${PARSE_DONE}" -eq 1 ]]; then
+  if [[ "$PARSE_DONE" -eq 1 ]]; then
     OPENCODE_ARGS+=("$1")
     shift
     continue
@@ -3771,7 +3778,7 @@ while [[ $# -gt 0 ]]; do
       exit 1
       ;;
     *)
-      if [[ -z "${PROJECT_DIR}" ]]; then
+      if [[ -z "$PROJECT_DIR" ]]; then
         PROJECT_DIR="$1"
       else
         error "unexpected argument before '--': $1"
@@ -3787,25 +3794,25 @@ done
 detect_landrun
 
 # Handle validation mode
-if [[ "${VALIDATE_MODE}" -eq 1 ]]; then
+if [[ "$VALIDATE_MODE" -eq 1 ]]; then
   run_validation
   exit $?
 fi
 
 # Check for conflicting flags
-if [[ "${RO_SET}" -eq 1 && "${RW_SET}" -eq 1 ]]; then
+if [[ "$RO_SET" -eq 1 && "$RW_SET" -eq 1 ]]; then
   error "--ro and --rw are mutually exclusive"
   exit 1
 fi
 
-if [[ "${ALLOW_HOST_TOOLS_SET}" -eq 1 && "${ALLOW_HOST_TOOLS_DISABLE_SET}" -eq 1 ]]; then
+if [[ "$ALLOW_HOST_TOOLS_SET" -eq 1 && "$ALLOW_HOST_TOOLS_DISABLE_SET" -eq 1 ]]; then
   error "--allow-host-tools and --no-host-tools are mutually exclusive"
   exit 1
 fi
 
 # PROJECT_DIR default
-if [[ -z "${PROJECT_DIR}" ]]; then
-  PROJECT_DIR="${PWD}"
+if [[ -z "$PROJECT_DIR" ]]; then
+  PROJECT_DIR="$PWD"
 fi
 
 apply_default_agent_if_needed
@@ -3826,25 +3833,25 @@ if bwrap --help 2>/dev/null | grep -q -- "--disable-userns"; then
   BWRAP_DISABLE_USERNS_SUPPORTED=1
 fi
 
-if ! command -v "${OPENCODE_BIN}" >/dev/null 2>&1; then
+if ! command -v "$OPENCODE_BIN" >/dev/null 2>&1; then
   error "opencode binary not found: ${OPENCODE_BIN}"
   exit 1
 fi
 
-if [[ ! -d "${PROJECT_DIR}" ]]; then
+if [[ ! -d "$PROJECT_DIR" ]]; then
   error "project directory does not exist: ${PROJECT_DIR}"
   exit 1
 fi
 
-if [[ "${FS_MODE}" != "ro" && "${FS_MODE}" != "rw" ]]; then
+if [[ "$FS_MODE" != "ro" && "$FS_MODE" != "rw" ]]; then
   error "invalid FS mode '${FS_MODE}' (expected 'ro' or 'rw')"
   exit 1
 fi
 
-PROJECT_DIR="$(realpath "${PROJECT_DIR}")"
-SANDBOX_WORKDIR="${PROJECT_DIR}"
+PROJECT_DIR="$(realpath "$PROJECT_DIR")"
+SANDBOX_WORKDIR="$PROJECT_DIR"
 
-if ! require_project_initialized "${PROJECT_DIR}" "launch"; then
+if ! require_project_initialized "$PROJECT_DIR" "launch"; then
   exit 1
 fi
 
@@ -3852,16 +3859,16 @@ init_metadata_dir
 update_phase "validated"
 append_session_log "starting session for ${PROJECT_DIR}"
 
-if [[ "${ALLOW_GIT}" -eq 1 ]]; then
+if [[ "$ALLOW_GIT" -eq 1 ]]; then
   append_approval_log "--allow-git enabled"
 fi
-if [[ "${ALLOW_INFRA}" -eq 1 ]]; then
+if [[ "$ALLOW_INFRA" -eq 1 ]]; then
   append_approval_log "--allow-infra enabled"
 fi
-if [[ "${NOT_PARANOID}" -eq 1 ]]; then
+if [[ "$NOT_PARANOID" -eq 1 ]]; then
   append_approval_log "--not-paranoid enabled"
 fi
-if [[ "${REQUIRE_LANDLOCK}" -eq 1 ]]; then
+if [[ "$REQUIRE_LANDLOCK" -eq 1 ]]; then
   append_approval_log "--require-landlock enabled"
 fi
 
@@ -3875,12 +3882,12 @@ fi
 
 # Network flags
 NET_FLAGS=()
-if [[ "${NET_MODE}" != "on" ]]; then
+if [[ "$NET_MODE" != "on" ]]; then
   NET_FLAGS+=(--unshare-net)
 fi
 
 # FS bind mode
-if [[ "${FS_MODE}" = "ro" ]]; then
+if [[ "$FS_MODE" = "ro" ]]; then
   BIND_FLAG="--ro-bind"
 else
   BIND_FLAG="--bind"
@@ -3902,13 +3909,13 @@ EXTRA_DIRS=()
 opt_bind() {
   local host_p="$1"
   local sand_p="$2"
-  if [[ -d "${host_p}" ]]; then
-    EXTRA_BINDS+=(--ro-bind "${host_p}" "${sand_p}")
+  if [[ -d "$host_p" ]]; then
+    EXTRA_BINDS+=(--ro-bind "$host_p" "$sand_p")
   fi
 }
 
 # Bind host tools only if explicitly requested
-if [[ "${ALLOW_HOST_TOOLS}" -eq 1 ]]; then
+if [[ "$ALLOW_HOST_TOOLS" -eq 1 ]]; then
   info "Binding host development tools (--allow-host-tools)"
 
   # User binaries
@@ -3927,8 +3934,8 @@ if [[ "${ALLOW_HOST_TOOLS}" -eq 1 ]]; then
   # uv
   if [[ -d "${HOME}/.local/share/uv" ]]; then
     EXTRA_BINDS+=(--ro-bind "${HOME}/.local/share/uv" "/home/gaeta/.local/share/uv")
-    if [[ "${HOST_HOME}" != "/home/gaeta" ]]; then
-      EXTRA_DIRS+=(--dir "${HOST_HOME}")
+    if [[ "$HOST_HOME" != "/home/gaeta" ]]; then
+      EXTRA_DIRS+=(--dir "$HOST_HOME")
       EXTRA_BINDS+=(--ro-bind "${HOME}/.local/share/uv" "${HOST_HOME}/.local/share/uv")
     fi
   fi
@@ -3940,8 +3947,8 @@ if [[ "${ALLOW_HOST_TOOLS}" -eq 1 ]]; then
     PYENV_ROOT_SANDBOX="/home/gaeta/.pyenv"
 
     # Mirror pyenv into original host home path for existing venvs
-    if [[ "${HOST_HOME}" != "/home/gaeta" ]]; then
-      EXTRA_DIRS+=(--dir "${HOST_HOME}")
+    if [[ "$HOST_HOME" != "/home/gaeta" ]]; then
+      EXTRA_DIRS+=(--dir "$HOST_HOME")
       EXTRA_BINDS+=(--ro-bind "${HOME}/.pyenv" "${HOST_HOME}/.pyenv")
     fi
   fi
@@ -3967,7 +3974,7 @@ if [[ "${ALLOW_HOST_TOOLS}" -eq 1 ]]; then
 fi
 
 # Project-local state for mise (always)
-if [[ -n "${PROJECT_DIR}" ]]; then
+if [[ -n "$PROJECT_DIR" ]]; then
   mkdir -p "${PROJECT_DIR}/.local/state/mise"
   EXTRA_BINDS+=(--bind "${PROJECT_DIR}/.local/state/mise" "/home/gaeta/.local/state/mise")
 fi
@@ -4018,15 +4025,15 @@ PROTECTED_INFRA_FILES=(
 )
 
 SAFE_BINDS=()
-if [[ "${ALLOW_INFRA}" -eq 0 ]]; then
+if [[ "$ALLOW_INFRA" -eq 0 ]]; then
   for dir in "${PROTECTED_INFRA_DIRS[@]}"; do
-    if [[ "${dir}" == ".git" && "${ALLOW_GIT}" -eq 1 ]]; then
+    if [[ "$dir" == ".git" && "$ALLOW_GIT" -eq 1 ]]; then
       continue
     fi
-    if [[ "${dir}" == "node_modules" && "${ALLOW_NODE_MODULES}" -eq 1 ]]; then
+    if [[ "$dir" == "node_modules" && "$ALLOW_NODE_MODULES" -eq 1 ]]; then
       continue
     fi
-    if [[ "${dir}" == ".venv" && "${ALLOW_VENV}" -eq 1 ]]; then
+    if [[ "$dir" == ".venv" && "$ALLOW_VENV" -eq 1 ]]; then
       continue
     fi
 
@@ -4052,7 +4059,7 @@ BWRAP_CMD=(
   --ro-bind /lib /lib
 )
 
-if [[ "${BWRAP_DISABLE_USERNS_SUPPORTED}" -eq 1 ]]; then
+if [[ "$BWRAP_DISABLE_USERNS_SUPPORTED" -eq 1 ]]; then
   BWRAP_CMD=(bwrap --unshare-user "${BWRAP_CMD[@]:1}")
   BWRAP_CMD+=(--disable-userns)
 else
@@ -4073,7 +4080,7 @@ fi
 
 BWRAP_CMD+=(--ro-bind /etc /etc)
 
-if [[ "${RESTRICT_DEV}" -eq 1 ]]; then
+if [[ "$RESTRICT_DEV" -eq 1 ]]; then
   BWRAP_CMD+=(
     --dev-bind /dev/null /dev/null
     --dev-bind /dev/zero /dev/zero
@@ -4100,10 +4107,10 @@ BWRAP_CMD+=(
 
 BWRAP_CMD+=("${EXTRA_DIRS[@]}")
 BWRAP_CMD+=("${EXTRA_BINDS[@]}")
-if [[ "${SANDBOX_WORKDIR}" != "/" ]]; then
-  BWRAP_CMD+=(--dir "${SANDBOX_WORKDIR}")
+if [[ "$SANDBOX_WORKDIR" != "/" ]]; then
+  BWRAP_CMD+=(--dir "$SANDBOX_WORKDIR")
 fi
-BWRAP_CMD+=("${BIND_FLAG}" "${PROJECT_DIR}" "${SANDBOX_WORKDIR}")
+BWRAP_CMD+=("$BIND_FLAG" "$PROJECT_DIR" "$SANDBOX_WORKDIR")
 
 if [[ ${#SAFE_BINDS[@]} -gt 0 ]]; then
   BWRAP_CMD+=("${SAFE_BINDS[@]}")
@@ -4111,59 +4118,59 @@ fi
 
 # Data/cache binding (always for persistence)
 BWRAP_CMD+=(
-  --bind "${OPENCODE_DATA}" /home/gaeta/.local/share/opencode
-  --bind "${OPENCODE_CACHE}" /home/gaeta/.cache/opencode
+  --bind "$OPENCODE_DATA" /home/gaeta/.local/share/opencode
+  --bind "$OPENCODE_CACHE" /home/gaeta/.cache/opencode
 )
 
 # Config overlay: ONLY bind specific config files, not the directory
-if [[ -n "${CUSTOM_CONFIG}" ]]; then
-  if [[ ! -f "${CUSTOM_CONFIG}" ]]; then
+if [[ -n "$CUSTOM_CONFIG" ]]; then
+  if [[ ! -f "$CUSTOM_CONFIG" ]]; then
     error "Selected config file not found: ${CUSTOM_CONFIG}"
     exit 1
   fi
-  BWRAP_CMD+=(--ro-bind "${CUSTOM_CONFIG}" /home/gaeta/.config/opencode/opencode.json)
+  BWRAP_CMD+=(--ro-bind "$CUSTOM_CONFIG" /home/gaeta/.config/opencode/opencode.json)
   info "Using config: ${CUSTOM_CONFIG}"
 else
   info "No opencode.json config found, OpenCode will use defaults"
 fi
 
-if [[ -n "${TUI_CONFIG}" ]]; then
-  if [[ ! -f "${TUI_CONFIG}" ]]; then
+if [[ -n "$TUI_CONFIG" ]]; then
+  if [[ ! -f "$TUI_CONFIG" ]]; then
     error "Selected TUI config file not found: ${TUI_CONFIG}"
     exit 1
   fi
-  BWRAP_CMD+=(--ro-bind "${TUI_CONFIG}" /home/gaeta/.config/opencode/tui.json)
+  BWRAP_CMD+=(--ro-bind "$TUI_CONFIG" /home/gaeta/.config/opencode/tui.json)
   info "Using TUI config: ${TUI_CONFIG}"
 else
   info "No tui.json config found, OpenCode TUI will use defaults"
 fi
 
-if [[ -n "${PROJECTED_AGENTS_DIR}" && -d "${PROJECTED_AGENTS_DIR}" ]]; then
-  BWRAP_CMD+=(--ro-bind "${PROJECTED_AGENTS_DIR}" /home/gaeta/.config/opencode/agents)
+if [[ -n "$PROJECTED_AGENTS_DIR" && -d "$PROJECTED_AGENTS_DIR" ]]; then
+  BWRAP_CMD+=(--ro-bind "$PROJECTED_AGENTS_DIR" /home/gaeta/.config/opencode/agents)
   info "Using projected agents directory: ${PROJECTED_AGENTS_DIR}"
 fi
 
-if [[ -n "${PROJECTED_COMMANDS_DIR}" && -d "${PROJECTED_COMMANDS_DIR}" ]]; then
-  BWRAP_CMD+=(--ro-bind "${PROJECTED_COMMANDS_DIR}" /home/gaeta/.config/opencode/commands)
+if [[ -n "$PROJECTED_COMMANDS_DIR" && -d "$PROJECTED_COMMANDS_DIR" ]]; then
+  BWRAP_CMD+=(--ro-bind "$PROJECTED_COMMANDS_DIR" /home/gaeta/.config/opencode/commands)
   info "Using projected commands directory: ${PROJECTED_COMMANDS_DIR}"
 fi
 
-if [[ -n "${PROJECTED_MODES_DIR}" && -d "${PROJECTED_MODES_DIR}" ]]; then
-  BWRAP_CMD+=(--ro-bind "${PROJECTED_MODES_DIR}" /home/gaeta/.config/opencode/modes)
+if [[ -n "$PROJECTED_MODES_DIR" && -d "$PROJECTED_MODES_DIR" ]]; then
+  BWRAP_CMD+=(--ro-bind "$PROJECTED_MODES_DIR" /home/gaeta/.config/opencode/modes)
   info "Using projected modes directory: ${PROJECTED_MODES_DIR}"
 fi
 
-if [[ -n "${PROJECTED_PLUGINS_DIR}" && -d "${PROJECTED_PLUGINS_DIR}" ]]; then
-  BWRAP_CMD+=(--ro-bind "${PROJECTED_PLUGINS_DIR}" /home/gaeta/.config/opencode/plugins)
+if [[ -n "$PROJECTED_PLUGINS_DIR" && -d "$PROJECTED_PLUGINS_DIR" ]]; then
+  BWRAP_CMD+=(--ro-bind "$PROJECTED_PLUGINS_DIR" /home/gaeta/.config/opencode/plugins)
   info "Using projected plugins directory: ${PROJECTED_PLUGINS_DIR}"
 fi
 
-BWRAP_CMD+=(--chdir "${SANDBOX_WORKDIR}")
+BWRAP_CMD+=(--chdir "$SANDBOX_WORKDIR")
 BWRAP_CMD+=("${NET_FLAGS[@]}")
 BWRAP_CMD+=(
   --die-with-parent
   --clearenv
-  --setenv PATH "${SANDBOX_PATH}"
+  --setenv PATH "$SANDBOX_PATH"
   --setenv HOME /home/gaeta
   --setenv USER gaeta
   --setenv LOGNAME gaeta
@@ -4171,7 +4178,7 @@ BWRAP_CMD+=(
   --setenv UV_LINK_MODE copy
 )
 
-if [[ "${TTY_SESSION_MODE}" == "strict" ]]; then
+if [[ "$TTY_SESSION_MODE" == "strict" ]]; then
   BWRAP_CMD+=(--new-session)
   info "TTY session mode: strict (${TTY_SESSION_REASON})"
 else
@@ -4179,22 +4186,22 @@ else
 fi
 
 if [[ -n "${PYENV_ROOT_SANDBOX:-}" ]]; then
-  BWRAP_CMD+=(--setenv PYENV_ROOT "${PYENV_ROOT_SANDBOX}")
+  BWRAP_CMD+=(--setenv PYENV_ROOT "$PYENV_ROOT_SANDBOX")
 fi
 
 if [[ -n "${RUSTUP_HOME_SANDBOX:-}" ]]; then
-  BWRAP_CMD+=(--setenv RUSTUP_HOME "${RUSTUP_HOME_SANDBOX}")
+  BWRAP_CMD+=(--setenv RUSTUP_HOME "$RUSTUP_HOME_SANDBOX")
 fi
 
 if [[ -n "${CARGO_HOME_SANDBOX:-}" ]]; then
-  BWRAP_CMD+=(--setenv CARGO_HOME "${CARGO_HOME_SANDBOX}")
+  BWRAP_CMD+=(--setenv CARGO_HOME "$CARGO_HOME_SANDBOX")
 fi
 
 if [[ -n "${PYO3_PYTHON:-}" ]]; then
   BWRAP_CMD+=(--setenv PYO3_PYTHON "${SANDBOX_WORKDIR}/.venv/bin/python")
 fi
 
-BWRAP_CMD+=("${OPENCODE_BIN}" "${OPENCODE_ARGS[@]}")
+BWRAP_CMD+=("$OPENCODE_BIN" "${OPENCODE_ARGS[@]}")
 
 # ====== PARANOID MODE: Execution Decision ======
 
@@ -4202,19 +4209,19 @@ BWRAP_CMD+=("${OPENCODE_BIN}" "${OPENCODE_ARGS[@]}")
 USE_PARANOID=0
 LANDLOCK_CHECK_RC=0
 
-if [[ "${REQUIRE_LANDLOCK}" -eq 1 && "${LANDRUN_AVAILABLE}" -eq 0 ]]; then
+if [[ "$REQUIRE_LANDLOCK" -eq 1 && "$LANDRUN_AVAILABLE" -eq 0 ]]; then
   error "--require-landlock set, but landrun is not available in PATH"
   update_phase "error"
   append_session_log "landlock requirement failed: landrun missing"
   exit 1
 fi
 
-if [[ "${NOT_PARANOID}" -eq 0 && "${LANDRUN_AVAILABLE}" -eq 1 ]]; then
+if [[ "$NOT_PARANOID" -eq 0 && "$LANDRUN_AVAILABLE" -eq 1 ]]; then
   if check_landlock_support; then
     USE_PARANOID=1
   else
     LANDLOCK_CHECK_RC=$?
-    if [[ "${LANDLOCK_CHECK_RC}" -eq 2 ]]; then
+    if [[ "$LANDLOCK_CHECK_RC" -eq 2 ]]; then
       update_phase "error"
       append_session_log "landlock requirement failed: kernel support unavailable"
       exit 1
@@ -4222,7 +4229,7 @@ if [[ "${NOT_PARANOID}" -eq 0 && "${LANDRUN_AVAILABLE}" -eq 1 ]]; then
   fi
 fi
 
-if [[ "${USE_PARANOID}" -eq 1 ]]; then
+if [[ "$USE_PARANOID" -eq 1 ]]; then
   update_phase "build-landrun"
   info_blue "🔒 Paranoid mode enabled (defense-in-depth: Landlock + Bubblewrap)"
   info_blue "Using landrun: ${LANDRUN_BIN} (Landlock ABI v${LANDLOCK_ABI_VERSION})"
@@ -4230,18 +4237,18 @@ if [[ "${USE_PARANOID}" -eq 1 ]]; then
   # Build landrun wrapper
   translate_paths_to_landrun
   translate_network_to_landrun
-  build_landrun_command BWRAP_CMD
+  build_landrun_command
 
-  write_command_json "paranoid" "${LANDRUN_BIN}"
+  write_command_json "paranoid" "$LANDRUN_BIN"
   append_session_log "launch mode=paranoid net=${NET_MODE} fs=${FS_MODE}"
   update_phase "execute"
   info "Launching gaeta paranoid sandbox..."
   exec "${LANDRUN_CMD[@]}"
 else
   update_phase "build-bwrap"
-  if [[ "${NOT_PARANOID}" -eq 1 && "${LANDRUN_AVAILABLE}" -eq 1 ]]; then
+  if [[ "$NOT_PARANOID" -eq 1 && "$LANDRUN_AVAILABLE" -eq 1 ]]; then
     info "Running in standard mode (bubblewrap only, --not-paranoid)"
-  elif [[ "${LANDRUN_AVAILABLE}" -eq 0 ]]; then
+  elif [[ "$LANDRUN_AVAILABLE" -eq 0 ]]; then
     info "Running in standard mode (bubblewrap only, landrun not available)"
   fi
 

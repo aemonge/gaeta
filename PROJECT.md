@@ -26,10 +26,11 @@
 - Dedicated threat modeling is now documented in `docs/threat-model.md`.
 - Doctor test fixtures are now centralized under `tests/fixtures/`.
 - Migration guidance from legacy `docs/.opencode` paths is documented in `docs/migration-docs-opencode.md`.
+- `make lint` now runs shellharden in-band for both test scripts and the `gaeta` wrapper.
 
 ## Next Step
 
-Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
+Extend `gaeta pause` snapshot detail (without adding extra alias commands).
 
 ## Resume Prompt
 
