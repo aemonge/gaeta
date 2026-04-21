@@ -9,7 +9,7 @@
 - [x] Add migration note for projects using `docs/.opencode`.
 - [x] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
 - [x] Add runtime coverage for shellharden-refactored launch branches (`--not-paranoid`, `--require-landlock` without `landrun`).
-- [ ] Ensure reviewer-agent medium/high risk findings are written back into `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md` before session end.
+- [x] Ensure reviewer-agent medium/high risk findings are written back into `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md` before session end.
 - [x] Extend `gaeta pause` snapshot detail (without adding extra alias commands).
 - [ ] Investigate slow startup path for `gaeta` and add profiling-based optimization plan.
 - [ ] Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
@@ -17,6 +17,6 @@
 - [ ] Create a full TUI demo script (with video) for `plan -> build -> review` with `/resume`, `/pause`, and `/evolve`.
 - [x] Fix slash-command launcher robustness when `gaeta` is not available in PATH from non-gaeta projects (`/pause` currently fails with `gaeta: command not found` in some sessions).
 - [x] Update gaeta command/agent prompt templates to explicitly account for bubblewrap isolation (no direct access to host home paths) and prefer reporting host-side verification steps when needed.
-- [ ] Evaluate whether `build` should default-allow `todowrite`, `python -q`, and `pytest` in all environments; keep an escape hatch for stricter repos.
-- [ ] Re-evaluate whether backup command should be deprecated now that init-first onboarding and handoff continuity are in place.
+- [x] Evaluate whether `build` should default-allow `todowrite`, `python -q`, and `pytest` in all environments; keep an escape hatch for stricter repos.
+- [x] Re-evaluate whether backup command should be deprecated now that init-first onboarding and handoff continuity are in place.
 - [ ] Decide whether to remove legacy `gaeta proposal` subcommands once `/evolve` command UX is finalized.

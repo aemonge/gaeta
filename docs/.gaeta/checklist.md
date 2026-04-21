@@ -39,7 +39,10 @@
 - [x] Extend `gaeta pause` snapshot detail to include `/go` cycle state.
 - [x] Update command/agent prompt templates with bubblewrap host-visibility guidance and host-side verification fallback wording.
 - [x] Fix slash-command launcher robustness when `gaeta` is not available in PATH by adding a per-user fallback launcher path.
-- [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan.
+- [x] Require reviewer-agent medium/high risk follow-ups to be written back into checklist/backlog before session end.
+- [x] Confirm `build` defaults keep `todowrite`, `python -q`, and `pytest` enabled with project-level strict override guidance.
+- [x] Re-evaluate backup deprecation and keep `gaeta backup` as supported for now.
+- [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan (deferred by operator).
 - [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
 - [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.
 - [x] Add OpenCode slash-command pack: `/check`, `/doctor`, `/propose`, `/approve`, `/reject`, `/resume`.

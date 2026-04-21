@@ -31,10 +31,13 @@
 - `gaeta pause` snapshot now includes `/go` cycle context (`selected role` and `next role in cycle`).
 - Command/agent prompt templates now explicitly handle bubblewrap host-path visibility limits and require host-side verification commands when needed.
 - Slash-command launcher resolution now includes `~/.config/gaeta/bin/gaeta` fallback, and `make build` installs the launcher there.
+- Review prompts now require medium/high-risk follow-up writeback into checklist/backlog before session end.
+- Build defaults keep `todowrite`, `python -q`, and `pytest` enabled, with strictness handled through project-local overrides.
+- `gaeta backup` remains supported and is not deprecated.
 
 ## Next Step
 
-Investigate slow startup path for `gaeta` and add a profiling-based optimization plan.
+Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
 
 ## Resume Prompt
 

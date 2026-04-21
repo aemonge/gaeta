@@ -84,6 +84,9 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Extended `gaeta pause` snapshots to include `/go` cycle state (`selected role`, `next role`, and cycle-state note) and added tests for the new snapshot fields.
 - Updated command/agent prompt templates to explicitly account for bubblewrap host-path visibility limits and require host-side verification commands when direct verification is not possible.
 - Improved slash-command launcher robustness by adding `~/.config/gaeta/bin/gaeta` fallback guidance in command templates and installing the launcher there via `make build`.
+- Enforced review workflow writeback policy so medium/high-risk follow-ups must be recorded in checklist/backlog, with prompt and test coverage updates.
+- Confirmed build-agent defaults keep `todowrite`, `python -q`, and `pytest` enabled, with guidance to tighten permissions via project-local `opencode.json` overrides when needed.
+- Re-evaluated backup deprecation and kept `gaeta backup` supported as an explicit hard-save continuity guardrail.
 
 ## In progress
 
@@ -95,7 +98,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Investigate slow startup path for `gaeta` and add a profiling-based optimization plan.
+Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
 
 ## Decisions
 
@@ -146,3 +149,6 @@ Investigate slow startup path for `gaeta` and add a profiling-based optimization
 - Pause snapshots include `/go` cycle-state context for better handoff continuity without adding new alias commands.
 - Prompt templates now require explicit host-side verification guidance whenever sandbox visibility limits direct inspection of host-home paths.
 - Slash-command launcher resolution order is now `./gaeta` -> `gaeta` from PATH -> `~/.config/gaeta/bin/gaeta` fallback for non-gaeta projects.
+- Startup profiling remains intentionally deferred by operator request; prioritize policy and workflow reliability slices first.
+- Build-agent practical defaults (`todowrite`, `python -q`, `pytest`) remain enabled by default; strictness is achieved through project-level permission overrides.
+- `gaeta backup` remains supported and is not deprecated at this stage.
