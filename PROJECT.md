@@ -23,10 +23,11 @@
 - Config projection examples are documented in both `docs/config-sample.md` and `docs/architecture.md`.
 - Projection safety policy is now documented as `mirror-only` in `docs/architecture.md`.
 - Linux/macOS portability notes are documented in `docs/architecture.md`.
+- Dedicated threat modeling is now documented in `docs/threat-model.md`.
 
 ## Next Step
 
-Add threat model document.
+Add fixture repository layout.
 
 ## Resume Prompt
 

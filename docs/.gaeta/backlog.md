@@ -4,7 +4,7 @@
 - [x] Add projection safety matrix for symlink vs mirror decisions.
 - [x] Add Linux/macOS portability notes.
 - [x] Make `/go` keep validation commands visible to agents but hidden from user-facing chat output.
-- [ ] Add threat model document.
+- [x] Add threat model document.
 - [ ] Add fixture repository layout.
 - [ ] Add migration note for projects using `docs/.opencode`.
 - [ ] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.

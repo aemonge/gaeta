@@ -550,18 +550,17 @@ Known constraints:
 
 ### Threat Model
 
-**Protected against**:
+The detailed gaeta threat model now lives in `docs/threat-model.md`.
 
-- Agents modifying system files (bwrap isolation)
-- Agents exfiltrating data (network restrictions)
-- Malicious LLM output executing arbitrary code (sandbox)
-- Resource exhaustion (limits enforced)
+At a high level, gaeta is designed to reduce risk through:
 
-**Not protected against** (explicit design choices):
+- Linux-first sandbox isolation and optional defense-in-depth controls.
+- Mirror-only projection for deterministic repo-local runtime artifacts.
+- Explicit per-agent command policies with human-in-the-loop approval for risky
+  operations.
 
-- Human approving malicious code (trust human judgment)
-- Local LLM generating harmful prompts (trust LLM choice)
-- Physical access to machine (outside scope)
+Known limitations and accepted risks are documented in
+`docs/threat-model.md` and should be treated as the source of truth.
 
 ### Privacy
 

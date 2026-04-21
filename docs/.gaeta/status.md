@@ -76,10 +76,11 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Added rotating `gaeta go` kickoff flow and wired `/go` (`agent: plan`) to rotate `plan -> build -> review` per invocation.
 - Updated `gaeta go` with output formats (`user`/`agent`), commit-aware reset to `plan` on git HEAD changes, and cycle-state self-healing with runtime logs.
 - Added Linux/macOS portability notes in `docs/architecture.md` with per-platform capability guidance, verification commands, and known sandbox constraints.
+- Added dedicated `docs/threat-model.md` as the detailed security source of truth, and reduced `docs/architecture.md` threat content to a high-level pointer.
 
 ## In progress
 
-- Add threat model document.
+- None.
 
 ## Blockers
 
@@ -87,7 +88,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Add threat model document.
+Add fixture repository layout.
 
 ## Decisions
 
@@ -130,3 +131,4 @@ Add threat model document.
 - Operator slash command surface now includes `/go`, backed by a rotating `plan -> build -> review` kickoff cycle.
 - `/go` default user output intentionally omits validation command lists; `--format agent` keeps validation commands visible for agent execution.
 - Portability policy is now explicit: Linux-first sandbox guarantees, macOS partial sandbox validation with documented fallback expectations.
+- Threat-model details now live in `docs/threat-model.md`; `docs/architecture.md` keeps only high-level security context.
