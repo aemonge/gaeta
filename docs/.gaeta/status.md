@@ -88,6 +88,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Confirmed build-agent defaults keep `todowrite`, `python -q`, and `pytest` enabled, with guidance to tighten permissions via project-local `opencode.json` overrides when needed.
 - Re-evaluated backup deprecation and kept `gaeta backup` supported as an explicit hard-save continuity guardrail.
 - Updated `/evolve` guidance to prefer native OpenCode approve/reject semantics first, with explicit `gaeta proposal` fallback commands.
+- Added `docs/tui-agent-ux-review.md` with a ranked UX assessment for role-selection/operator flow and a smallest next implementation slice.
 
 ## In progress
 
@@ -99,7 +100,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
+Add an operator-facing role/command matrix in `GAETA.md` and link it to `docs/tui-agent-ux-review.md`.
 
 ## Decisions
 
@@ -154,3 +155,5 @@ Review OpenCode TUI agent-selection UX and document improvements for gaeta opera
 - Build-agent practical defaults (`todowrite`, `python -q`, `pytest`) remain enabled by default; strictness is achieved through project-level permission overrides.
 - `gaeta backup` remains supported and is not deprecated at this stage.
 - Proposal approval guidance is now native-first (`/approve` / `/reject`) with `gaeta proposal` fallback for environments without native command support.
+- Legacy `gaeta proposal` subcommands stay supported for now; revisit removal only after `/evolve` UX parity is demonstrated.
+- Startup profiling and TUI demo script/video items are deferred and not planned for the current cycle.

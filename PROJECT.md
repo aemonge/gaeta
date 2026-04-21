@@ -35,10 +35,12 @@
 - Build defaults keep `todowrite`, `python -q`, and `pytest` enabled, with strictness handled through project-local overrides.
 - `gaeta backup` remains supported and is not deprecated.
 - Proposal guidance is now native-first for approve/reject (`/approve` / `/reject`) with explicit `gaeta proposal` fallback commands.
+- OpenCode TUI agent-selection UX review is documented in `docs/tui-agent-ux-review.md`.
+- Legacy `gaeta proposal` subcommands remain supported for now; removal is deferred until `/evolve` UX parity.
 
 ## Next Step
 
-Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
+Add an operator-facing role/command matrix in `GAETA.md` and link it to `docs/tui-agent-ux-review.md`.
 
 ## Resume Prompt
 

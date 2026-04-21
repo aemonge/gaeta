@@ -43,7 +43,9 @@
 - [x] Integrate proposal approve/reject guidance with native OpenCode semantics first and explicit `gaeta proposal` fallback commands.
 - [x] Confirm `build` defaults keep `todowrite`, `python -q`, and `pytest` enabled with project-level strict override guidance.
 - [x] Re-evaluate backup deprecation and keep `gaeta backup` as supported for now.
-- [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan (deferred by operator).
+- [x] Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
+- [x] Decide to keep legacy `gaeta proposal` subcommands for now; prefer native `/approve`/`/reject` and revisit removal after `/evolve` parity.
+- [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan (deferred, not planned now).
 - [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
 - [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.
 - [x] Add OpenCode slash-command pack: `/check`, `/doctor`, `/propose`, `/approve`, `/reject`, `/resume`.
