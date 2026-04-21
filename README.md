@@ -19,6 +19,50 @@ The target model is:
 The goal is not "replace OpenCode". The goal is "compose a stricter, more opinionated
 operator layer around OpenCode".
 
+## Quickstart
+
+```bash
+make build
+./gaeta doctor .
+./gaeta init .
+./gaeta go --show --format user .
+```
+
+If you use OpenCode slash commands, start with:
+
+- `/resume` to restore context,
+- `/go` to start the next rotated slice,
+- `/pause` to checkpoint state.
+
+## Who gaeta is for
+
+- Teams that want OpenCode compatibility with stricter workflow discipline.
+- Operators who prefer documentation-first state (`docs/.gaeta/*`) and explicit gates.
+- Repositories that need reproducible role/command policy without forking OpenCode.
+
+Not for:
+
+- Projects that want fully implicit/autonomous agent mutation without documented checkpoints.
+- Workflows that do not want repo-local task/state files.
+
+## Project status
+
+- Stable preview for sharing and collaborative feedback.
+- Linux-first sandbox guarantees; macOS support is functional with reduced sandbox parity.
+- Known environment caveat: nested namespace limits can cause `bwrap` ENOSPC in constrained environments.
+- UX findings and next UX iteration priorities are documented in `docs/tui-agent-ux-review.md`.
+
+## 30-second flow
+
+```text
+1) ./gaeta doctor .
+2) ./gaeta init .
+3) /go
+4) Implement smallest approved slice
+5) /review
+6) /pause
+```
+
 ## Task tooling
 
 - Canonical task state lives in `docs/.gaeta/checklist.md`.

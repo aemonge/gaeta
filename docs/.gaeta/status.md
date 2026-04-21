@@ -90,6 +90,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Updated `/evolve` guidance to prefer native OpenCode approve/reject semantics first, with explicit `gaeta proposal` fallback commands.
 - Added `docs/tui-agent-ux-review.md` with a ranked UX assessment for role-selection/operator flow and a smallest next implementation slice.
 - Added an operator-facing role/command matrix in `GAETA.md` and linked policy language to the TUI UX review outcomes.
+- Refreshed `README.md` for external sharing with a quickstart, audience fit, project status/caveats, and a short operator flow.
 
 ## In progress
 

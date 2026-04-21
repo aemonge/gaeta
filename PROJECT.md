@@ -38,6 +38,7 @@
 - OpenCode TUI agent-selection UX review is documented in `docs/tui-agent-ux-review.md`.
 - `GAETA.md` now includes an operator-facing role/command matrix.
 - Legacy `gaeta proposal` subcommands remain supported until `/evolve` parity, then should be removed immediately (no deprecation window).
+- `README.md` now includes a public-friendly quickstart, audience fit, status caveats, and a short operator flow for new users.
 
 ## Next Step
 

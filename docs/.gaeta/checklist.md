@@ -46,6 +46,7 @@
 - [x] Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
 - [x] Add operator-facing role/command matrix in `GAETA.md`.
 - [x] Finalize legacy `gaeta proposal` subcommand removal policy: remove immediately after `/evolve` parity (no deprecation window).
+- [x] Refresh `README.md` for public sharing with quickstart, audience fit, status caveats, and a 30-second operator flow.
 - [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan (deferred, not planned now).
 - [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
 - [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.
