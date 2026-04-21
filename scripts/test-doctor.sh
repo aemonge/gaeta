@@ -363,6 +363,9 @@ assert "Default build-agent behavior keeps practical validation commands enabled
 assert "`gaeta backup` remains supported (not deprecated)" in gaeta_text, gaeta_text
 assert "Strict-repo override example" in gaeta_text, gaeta_text
 assert "Defer deprecation unless there is a validated replacement" in gaeta_text, gaeta_text
+assert "## Operator Role Matrix" in gaeta_text, gaeta_text
+assert "Lost-context recovery" in gaeta_text, gaeta_text
+assert "no deprecation window" in gaeta_text, gaeta_text
 
 config = json.loads((repo_root / "opencode.json").read_text(encoding="utf-8"))
 for agent_name in ["plan", "build", "review"]:

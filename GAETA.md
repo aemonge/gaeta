@@ -51,6 +51,18 @@ At session end:
 - Implementation review and validation: `/review`.
 - Agent/workflow evolution: `/evolve`.
 
+## Operator Role Matrix
+
+| Intent | Preferred command | Agent | Expected outcome |
+| --- | --- | --- | --- |
+| Resume a session | `/resume` | `plan` | Continue from documented pause/context |
+| Quick project snapshot | `/status` | `plan` | Phase, next step, pending items, blockers |
+| Checkpoint current work | `/pause` | `build` | Updated pause snapshot and synced status |
+| Start next implementation slice | `/go` | `plan` (rotating) | Rotated kickoff bundle (`plan -> build -> review`) |
+| Validate and assess risk | `/review` | `review` | Findings, validation status, manual checks |
+| Propose workflow changes | `/evolve` | `plan` | Proposal artifact + approval/reject guidance |
+| Lost-context recovery | `/status` -> `/pause` -> `/resume` | mixed | Re-anchor state, checkpoint, then resume |
+
 ## Agent Roles
 
 - gaeta-native roles: `plan`, `build`, `review`.
@@ -72,6 +84,13 @@ At session end:
 - `gaeta backup` remains supported (not deprecated) as a hard-save guardrail for workflow continuity.
 - Revisit deprecation only after equivalent safety and recovery guarantees are proven across init/pause/resume flows.
 - Defer deprecation unless there is a validated replacement that preserves the same recoverability guarantees for workflow files and operator checkpoints.
+
+## Proposal Lifecycle Policy
+
+- Native approve/reject semantics are preferred in operator flow (`/approve`, `/reject`).
+- `gaeta proposal create|list|approve|reject` remains supported as explicit fallback.
+- Legacy `gaeta proposal` subcommands are removed only when `/evolve` reaches parity for create, list/discovery, approve/reject with reason, and recovery guidance.
+- Once parity is validated, remove legacy subcommands immediately (no deprecation window).
 
 ## Source of Truth
 
