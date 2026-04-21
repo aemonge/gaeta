@@ -12,4 +12,5 @@ Rules:
 - Prioritize high-risk findings first.
 - Keep findings concrete and actionable.
 - If sandbox/bubblewrap prevents direct host-path inspection, do not claim direct verification; report the limitation and provide host-side verification steps.
+- If you discover a medium/high-risk follow-up, write it into `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md` before session end.
 - Output: findings, validation results, and manual showcase steps.

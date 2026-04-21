@@ -580,12 +580,15 @@ assert "Suggested commit:" in review_text, review_text
 assert "Conventional Commit" in review_text, review_text
 assert "sandbox/bubblewrap visibility prevents direct verification" in review_text, review_text
 assert "host-side verification commands" in review_text, review_text
+assert "Workflow writeback rule:" in review_text, review_text
+assert "must add it to `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md`" in review_text, review_text
 
 pause_text = (commands / "pause.md").read_text(encoding="utf-8")
 assert "host-side verification is required" in pause_text, pause_text
 
 review_agent_text = (agents_dir / "review.md").read_text(encoding="utf-8")
 assert "do not claim direct verification" in review_agent_text, review_agent_text
+assert "write it into `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md`" in review_agent_text, review_agent_text
 
 build_agent_text = (agents_dir / "build.md").read_text(encoding="utf-8")
 assert "host-side verification commands" in build_agent_text, build_agent_text
@@ -604,6 +607,10 @@ assert "GAETA_DOCTOR_SKIP_SANDBOX=1 ./gaeta doctor --verbose ." in architecture_
 
 project_text = (repo / "PROJECT.md").read_text(encoding="utf-8")
 assert "Linux/macOS portability notes are documented in `docs/architecture.md`." in project_text, project_text
+
+gaeta_text = (repo / "GAETA.md").read_text(encoding="utf-8")
+assert "Default build-agent behavior keeps practical validation commands enabled" in gaeta_text, gaeta_text
+assert "`gaeta backup` remains supported (not deprecated)" in gaeta_text, gaeta_text
 
 config = json.loads((repo / "opencode.json").read_text(encoding="utf-8"))
 for agent_name in ["plan", "build", "review"]:

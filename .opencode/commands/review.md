@@ -23,6 +23,10 @@ Then reply with a concise review bundle:
 - recommended human checks before commit,
 - a short manual showcase describing how a human can run and verify the feature.
 
+Workflow writeback rule:
+- If you identify a medium/high-risk follow-up item, you must add it to `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md` before ending the session.
+- If you cannot edit files in the current runtime, explicitly report the exact follow-up item text and target file so the operator can apply it immediately.
+
 Sandbox visibility rule:
 - If sandbox/bubblewrap visibility prevents direct verification (for example host-home paths such as `~/.config/*`), do not claim direct verification.
 - Explicitly state the limitation and provide host-side verification commands a human can run.

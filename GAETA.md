@@ -60,6 +60,17 @@ At session end:
 - Bare `gaeta` defaults to `--agent plan` when no agent is provided.
 - `gaeta resume` defaults to `--agent plan`.
 
+## Build Permission Policy
+
+- Default build-agent behavior keeps practical validation commands enabled: `todowrite`, `python -q`, and `pytest`.
+- For stricter repositories, use a project-local override in `opencode.json` to tighten `build` permissions instead of changing global defaults.
+- Keep stricter overrides explicit and versioned per project.
+
+## Backup Policy
+
+- `gaeta backup` remains supported (not deprecated) as a hard-save guardrail for workflow continuity.
+- Revisit deprecation only after equivalent safety and recovery guarantees are proven across init/pause/resume flows.
+
 ## Source of Truth
 
 - Canonical workflow control plane: `docs/.gaeta/*`.
