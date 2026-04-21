@@ -89,6 +89,48 @@ DOCTOR_VERBOSE_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_S
 [[ "$DOCTOR_VERBOSE_OUTPUT" == *"Dependencies"* ]]
 [[ "$DOCTOR_VERBOSE_OUTPUT" == *"Summary"* ]]
 
+FAKE_LAUNCH_BIN_DIR="${TEST_ROOT}/fake-launch-bin"
+mkdir -p "$FAKE_LAUNCH_BIN_DIR"
+cat >"${FAKE_LAUNCH_BIN_DIR}/bwrap" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == "--help" ]]; then
+  printf '%s\n' "bubblewrap mock --disable-userns"
+  exit 0
+fi
+
+printf '%s\n' "GAETA_BWRAP_EXECUTED"
+exit 0
+SH
+chmod +x "${FAKE_LAUNCH_BIN_DIR}/bwrap"
+
+LAUNCH_NOT_PARANOID_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true PATH="${FAKE_LAUNCH_BIN_DIR}:$PATH" "$GAETA_BIN" --not-paranoid "$TEST_PROJECT")"
+[[ "$LAUNCH_NOT_PARANOID_OUTPUT" == *"GAETA_BWRAP_EXECUTED"* ]]
+
+FAKE_NO_LANDRUN_BIN_DIR="${TEST_ROOT}/fake-no-landrun-bin"
+mkdir -p "$FAKE_NO_LANDRUN_BIN_DIR"
+cat >"${FAKE_NO_LANDRUN_BIN_DIR}/bwrap" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == "--help" ]]; then
+  printf '%s\n' "bubblewrap mock --disable-userns"
+  exit 0
+fi
+
+printf '%s\n' "GAETA_BWRAP_UNEXPECTED"
+exit 0
+SH
+chmod +x "${FAKE_NO_LANDRUN_BIN_DIR}/bwrap"
+
+set +e
+LAUNCH_REQUIRE_LANDLOCK_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true PATH="${FAKE_NO_LANDRUN_BIN_DIR}:/bin" "$GAETA_BIN" --require-landlock "$TEST_PROJECT" 2>&1)"
+LAUNCH_REQUIRE_LANDLOCK_STATUS=$?
+set -e
+[[ "$LAUNCH_REQUIRE_LANDLOCK_STATUS" -ne 0 ]]
+[[ "$LAUNCH_REQUIRE_LANDLOCK_OUTPUT" != *"GAETA_BWRAP_UNEXPECTED"* ]]
+
 UNINIT_PROJECT="${TEST_ROOT}/uninitialized-project"
 mkdir -p "$UNINIT_PROJECT"
 

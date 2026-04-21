@@ -127,6 +127,54 @@ SH
   [[ "$output" != *"--agent: invalid option"* ]]
 }
 
+@test "launch --not-paranoid executes bubblewrap path" {
+  local fake_bin_dir="${TEST_ROOT}/fake-launch-bin"
+  mkdir -p "$fake_bin_dir"
+
+  cat >"${fake_bin_dir}/bwrap" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == "--help" ]]; then
+  printf '%s\n' "bubblewrap mock --disable-userns"
+  exit 0
+fi
+
+printf '%s\n' "GAETA_BWRAP_EXECUTED"
+exit 0
+SH
+  chmod +x "${fake_bin_dir}/bwrap"
+
+  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true PATH="${fake_bin_dir}:$PATH" \
+    "$GAETA_BIN" --not-paranoid "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"GAETA_BWRAP_EXECUTED"* ]]
+}
+
+@test "launch --require-landlock fails when landrun missing" {
+  local fake_bin_dir="${TEST_ROOT}/fake-no-landrun-bin"
+  mkdir -p "$fake_bin_dir"
+
+  cat >"${fake_bin_dir}/bwrap" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == "--help" ]]; then
+  printf '%s\n' "bubblewrap mock --disable-userns"
+  exit 0
+fi
+
+printf '%s\n' "GAETA_BWRAP_UNEXPECTED"
+exit 0
+SH
+  chmod +x "${fake_bin_dir}/bwrap"
+
+  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true PATH="${fake_bin_dir}:/bin" \
+    "$GAETA_BIN" --require-landlock "$TEST_PROJECT"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"GAETA_BWRAP_UNEXPECTED"* ]]
+}
+
 @test "init scaffolds missing workflow files and unblocks resume" {
   local uninit_project="${TEST_ROOT}/uninitialized-project"
   mkdir -p "$uninit_project"
