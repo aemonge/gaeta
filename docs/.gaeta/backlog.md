@@ -6,7 +6,7 @@
 - [x] Make `/go` keep validation commands visible to agents but hidden from user-facing chat output.
 - [x] Add threat model document.
 - [x] Add fixture repository layout.
-- [ ] Add migration note for projects using `docs/.opencode`.
+- [x] Add migration note for projects using `docs/.opencode`.
 - [ ] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
 - [ ] Extend `gaeta pause` snapshot detail (without adding extra alias commands).
 - [ ] Investigate slow startup path for `gaeta` and add profiling-based optimization plan.

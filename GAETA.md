@@ -63,4 +63,5 @@ At session end:
 ## Source of Truth
 
 - Canonical workflow control plane: `docs/.gaeta/*`.
+- Template path migration guide: `docs/migration-docs-opencode.md`.
 - `PROJECT.md` is a dashboard, not a second source of truth.

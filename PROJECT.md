@@ -25,10 +25,11 @@
 - Linux/macOS portability notes are documented in `docs/architecture.md`.
 - Dedicated threat modeling is now documented in `docs/threat-model.md`.
 - Doctor test fixtures are now centralized under `tests/fixtures/`.
+- Migration guidance from legacy `docs/.opencode` paths is documented in `docs/migration-docs-opencode.md`.
 
 ## Next Step
 
-Add migration note for projects using `docs/.opencode`.
+Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
 
 ## Resume Prompt
 

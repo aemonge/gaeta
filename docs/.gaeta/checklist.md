@@ -33,6 +33,7 @@
 - [x] Add Linux/macOS portability notes.
 - [x] Add threat model document.
 - [x] Add fixture repository layout.
+- [x] Add migration note for projects using `docs/.opencode`.
 - [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
 - [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.
 - [x] Add OpenCode slash-command pack: `/check`, `/doctor`, `/propose`, `/approve`, `/reject`, `/resume`.

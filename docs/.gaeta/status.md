@@ -78,6 +78,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Added Linux/macOS portability notes in `docs/architecture.md` with per-platform capability guidance, verification commands, and known sandbox constraints.
 - Added dedicated `docs/threat-model.md` as the detailed security source of truth, and reduced `docs/architecture.md` threat content to a high-level pointer.
 - Added reusable test fixture repository layout under `tests/fixtures/` and updated doctor test harnesses to copy fixtures instead of inline heredocs.
+- Added `docs/migration-docs-opencode.md` documenting migration from legacy `docs/.opencode/` template paths to canonical repo-root `.opencode/`.
 
 ## In progress
 
@@ -89,7 +90,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Add migration note for projects using `docs/.opencode`.
+Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
 
 ## Decisions
 
@@ -134,3 +135,4 @@ Add migration note for projects using `docs/.opencode`.
 - Portability policy is now explicit: Linux-first sandbox guarantees, macOS partial sandbox validation with documented fallback expectations.
 - Threat-model details now live in `docs/threat-model.md`; `docs/architecture.md` keeps only high-level security context.
 - Doctor test setup now uses repository fixtures in `tests/fixtures/` to reduce duplication across `tests/doctor.bats` and `scripts/test-doctor.sh`.
+- Command/agent templates are canonical under repo-root `.opencode/`; `docs/.opencode/` is legacy and should be migrated using `docs/migration-docs-opencode.md`.
