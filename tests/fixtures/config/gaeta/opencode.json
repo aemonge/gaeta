@@ -1,0 +1,13 @@
+{
+  "agent": {
+    "review": {
+      "permission": {
+        "edit": "deny"
+      }
+    }
+  },
+  "gaeta_only": "from_gaeta",
+  "nested": {
+    "overridden": "gaeta"
+  }
+}

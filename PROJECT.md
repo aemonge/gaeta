@@ -24,10 +24,11 @@
 - Projection safety policy is now documented as `mirror-only` in `docs/architecture.md`.
 - Linux/macOS portability notes are documented in `docs/architecture.md`.
 - Dedicated threat modeling is now documented in `docs/threat-model.md`.
+- Doctor test fixtures are now centralized under `tests/fixtures/`.
 
 ## Next Step
 
-Add fixture repository layout.
+Add migration note for projects using `docs/.opencode`.
 
 ## Resume Prompt
 

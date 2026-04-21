@@ -77,6 +77,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Updated `gaeta go` with output formats (`user`/`agent`), commit-aware reset to `plan` on git HEAD changes, and cycle-state self-healing with runtime logs.
 - Added Linux/macOS portability notes in `docs/architecture.md` with per-platform capability guidance, verification commands, and known sandbox constraints.
 - Added dedicated `docs/threat-model.md` as the detailed security source of truth, and reduced `docs/architecture.md` threat content to a high-level pointer.
+- Added reusable test fixture repository layout under `tests/fixtures/` and updated doctor test harnesses to copy fixtures instead of inline heredocs.
 
 ## In progress
 
@@ -88,7 +89,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Add fixture repository layout.
+Add migration note for projects using `docs/.opencode`.
 
 ## Decisions
 
@@ -132,3 +133,4 @@ Add fixture repository layout.
 - `/go` default user output intentionally omits validation command lists; `--format agent` keeps validation commands visible for agent execution.
 - Portability policy is now explicit: Linux-first sandbox guarantees, macOS partial sandbox validation with documented fallback expectations.
 - Threat-model details now live in `docs/threat-model.md`; `docs/architecture.md` keeps only high-level security context.
+- Doctor test setup now uses repository fixtures in `tests/fixtures/` to reduce duplication across `tests/doctor.bats` and `scripts/test-doctor.sh`.

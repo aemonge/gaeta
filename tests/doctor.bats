@@ -3,115 +3,17 @@
 setup() {
   REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
   GAETA_BIN="${REPO_ROOT}/gaeta"
+  FIXTURE_ROOT="${REPO_ROOT}/tests/fixtures"
 
   TEST_ROOT="$(mktemp -d)"
   TEST_HOME="${TEST_ROOT}/home"
   TEST_PROJECT="${TEST_ROOT}/project"
 
-  mkdir -p "${TEST_HOME}/.config/gaeta"
-  mkdir -p "${TEST_HOME}/.config/opencode"
-  mkdir -p "${TEST_PROJECT}/docs/.gaeta"
+  mkdir -p "${TEST_HOME}/.config"
+  cp -R "${FIXTURE_ROOT}/config/opencode" "${TEST_HOME}/.config/opencode"
+  cp -R "${FIXTURE_ROOT}/config/gaeta" "${TEST_HOME}/.config/gaeta"
 
-  cat >"${TEST_HOME}/.config/opencode/opencode.json" <<'JSON'
-{
-  "base_only": "from_opencode",
-  "agent": {
-    "plan": {
-      "permission": {
-        "edit": "deny"
-      }
-    },
-    "build": {
-      "permission": {
-        "edit": "allow"
-      }
-    }
-  },
-  "nested": {
-    "from_base": true,
-    "overridden": "base"
-  }
-}
-JSON
-
-  cat >"${TEST_HOME}/.config/gaeta/opencode.json" <<'JSON'
-{
-  "agent": {
-    "review": {
-      "permission": {
-        "edit": "deny"
-      }
-    }
-  },
-  "gaeta_only": "from_gaeta",
-  "nested": {
-    "overridden": "gaeta"
-  }
-}
-JSON
-
-  cat >"${TEST_HOME}/.config/opencode/tui.json" <<'JSON'
-{
-  "theme": "base",
-  "keybinds": {
-    "open": "ctrl+o"
-  }
-}
-JSON
-
-  cat >"${TEST_HOME}/.config/gaeta/tui.json" <<'JSON'
-{
-  "theme": "gaeta",
-  "keybinds": {
-    "quit": "ctrl+q"
-  }
-}
-JSON
-
-  cat >"${TEST_PROJECT}/docs/.gaeta/phases.md" <<'MD'
-# phases
-MD
-
-  cat >"${TEST_PROJECT}/docs/.gaeta/status.md" <<'MD'
-# Status
-
-## Current phase
-
-Phase X
-
-## Next step
-
-Implement sync behavior.
-
-## Blockers
-
-- none
-MD
-
-  cat >"${TEST_PROJECT}/docs/.gaeta/checklist.md" <<'MD'
-# Checklist
-
-## Current Sprint
-
-- [ ] Implement sync behavior.
-- [ ] Add methodology-enforced instructions.
-MD
-
-  cat >"${TEST_PROJECT}/docs/.gaeta/backlog.md" <<'MD'
-# backlog
-MD
-
-  cat >"${TEST_PROJECT}/PROJECT.md" <<'MD'
-# PROJECT
-
-## Resume Prompt
-
-`continue from resume helper output`
-MD
-
-  cat >"${TEST_PROJECT}/GAETA.md" <<'MD'
-# GAETA
-MD
+  cp -R "${FIXTURE_ROOT}/project/." "${TEST_PROJECT}/"
 }
 
 teardown() {

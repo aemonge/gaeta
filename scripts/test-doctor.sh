@@ -4,11 +4,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GAETA_BIN="${REPO_ROOT}/gaeta"
+FIXTURE_ROOT="${REPO_ROOT}/tests/fixtures"
 
-if [[ ! -x "$GAETA_BIN" ]]; then
-  echo "missing executable: ${GAETA_BIN}" >&2
-  exit 1
-fi
+[[ -x "$GAETA_BIN" ]] || printf '%s\n' "missing executable: ${GAETA_BIN}" >&2
+[[ -x "$GAETA_BIN" ]] || exit 1
 
 TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf "${TEST_ROOT}"' EXIT
@@ -16,114 +15,10 @@ trap 'rm -rf "${TEST_ROOT}"' EXIT
 TEST_HOME="${TEST_ROOT}/home"
 TEST_PROJECT="${TEST_ROOT}/project"
 
-mkdir -p "${TEST_HOME}/.config/gaeta"
-mkdir -p "${TEST_HOME}/.config/opencode"
-mkdir -p "${TEST_PROJECT}/docs/.gaeta"
-
-cat >"${TEST_HOME}/.config/opencode/opencode.json" <<'JSON'
-{
-  "base_only": "from_opencode",
-  "agent": {
-    "plan": {
-      "permission": {
-        "edit": "deny"
-      }
-    },
-    "build": {
-      "permission": {
-        "edit": "allow"
-      }
-    }
-  },
-  "nested": {
-    "from_base": true,
-    "overridden": "base"
-  }
-}
-JSON
-
-cat >"${TEST_HOME}/.config/gaeta/opencode.json" <<'JSON'
-{
-  "agent": {
-    "review": {
-      "permission": {
-        "edit": "deny"
-      }
-    }
-  },
-  "gaeta_only": "from_gaeta",
-  "nested": {
-    "overridden": "gaeta"
-  }
-}
-JSON
-
-cat >"${TEST_HOME}/.config/opencode/tui.json" <<'JSON'
-{
-  "theme": "base",
-  "keybinds": {
-    "open": "ctrl+o"
-  }
-}
-JSON
-
-cat >"${TEST_HOME}/.config/gaeta/tui.json" <<'JSON'
-{
-  "theme": "gaeta",
-  "keybinds": {
-    "quit": "ctrl+q"
-  }
-}
-JSON
-
-cat >"${TEST_PROJECT}/docs/.gaeta/phases.md" <<'MD'
-# phases
-MD
-
-cat >"${TEST_PROJECT}/docs/.gaeta/status.md" <<'MD'
-# Status
-
-## Current phase
-
-Phase X
-
-## In progress
-
-- Implement sync behavior.
-
-## Next step
-
-Implement sync behavior.
-
-## Blockers
-
-- none
-MD
-
-cat >"${TEST_PROJECT}/docs/.gaeta/checklist.md" <<'MD'
-# Checklist
-
-## Current Sprint
-
-- [ ] Implement sync behavior.
-- [ ] Add methodology-enforced instructions.
-MD
-
-cat >"${TEST_PROJECT}/docs/.gaeta/backlog.md" <<'MD'
-# backlog
-MD
-
-cat >"${TEST_PROJECT}/PROJECT.md" <<'MD'
-# PROJECT
-
-## Resume Prompt
-
-`continue from resume helper output`
-MD
-
-cat >"${TEST_PROJECT}/GAETA.md" <<'MD'
-# GAETA
-MD
+mkdir -p "${TEST_HOME}/.config"
+cp -R "${FIXTURE_ROOT}/config/opencode" "${TEST_HOME}/.config/opencode"
+cp -R "${FIXTURE_ROOT}/config/gaeta" "${TEST_HOME}/.config/gaeta"
+cp -R "${FIXTURE_ROOT}/project/." "${TEST_PROJECT}/"
 
 DOCTOR_JSON_PATH="${TEST_ROOT}/doctor.json"
 

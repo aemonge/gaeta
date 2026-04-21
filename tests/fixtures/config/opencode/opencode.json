@@ -1,0 +1,19 @@
+{
+  "base_only": "from_opencode",
+  "agent": {
+    "plan": {
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "build": {
+      "permission": {
+        "edit": "allow"
+      }
+    }
+  },
+  "nested": {
+    "from_base": true,
+    "overridden": "base"
+  }
+}

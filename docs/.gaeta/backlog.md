@@ -5,7 +5,7 @@
 - [x] Add Linux/macOS portability notes.
 - [x] Make `/go` keep validation commands visible to agents but hidden from user-facing chat output.
 - [x] Add threat model document.
-- [ ] Add fixture repository layout.
+- [x] Add fixture repository layout.
 - [ ] Add migration note for projects using `docs/.opencode`.
 - [ ] Expand shellharden compliance from test scripts to the main `gaeta` wrapper.
 - [ ] Extend `gaeta pause` snapshot detail (without adding extra alias commands).
