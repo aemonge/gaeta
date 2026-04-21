@@ -30,6 +30,7 @@
 - Runtime launch-path coverage now includes shellharden-refactored branches for `--not-paranoid` and missing-`landrun` `--require-landlock` behavior.
 - `gaeta pause` snapshot now includes `/go` cycle context (`selected role` and `next role in cycle`).
 - Command/agent prompt templates now explicitly handle bubblewrap host-path visibility limits and require host-side verification commands when needed.
+- Slash-command launcher resolution now includes `~/.config/gaeta/bin/gaeta` fallback, and `make build` installs the launcher there.
 
 ## Next Step
 
