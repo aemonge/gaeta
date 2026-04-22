@@ -49,6 +49,8 @@
 - [x] Tighten allow/ask policy: deny `plan` `todowrite`, scope build-agent bash allows to explicit test/build commands, and avoid overlapping wildcard families.
 - [x] Finalize legacy `gaeta proposal` subcommand removal policy: remove immediately after `/evolve` parity (no deprecation window).
 - [x] Refresh `README.md` for public sharing with quickstart, audience fit, status caveats, and a 30-second operator flow.
+- [x] Document Fence sandbox adoption as a deferred wishlist item with explicit decision gates; keep current Linux backend unchanged.
+- [x] Add `docs/fence-wishlist.md` as a linkable one-page decision note for deferred Fence evaluation triggers/gates.
 - [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan (deferred, not planned now).
 - [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
 - [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.

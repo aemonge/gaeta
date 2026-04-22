@@ -12,6 +12,7 @@
 - [x] Ensure reviewer-agent medium/high risk findings are written back into `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md` before session end.
 - [x] Extend `gaeta pause` snapshot detail (without adding extra alias commands).
 - [ ] Investigate slow startup path for `gaeta` and add profiling-based optimization plan (deferred, not planned now).
+- [ ] Re-evaluate Fence sandbox backend when macOS support becomes an active priority; require parity checklist, dependency review (`fence` + `socat`), and a rollback path before any default switch.
 - [x] Review OpenCode TUI agent-selection UX and document improvements for gaeta operator flow.
 - [x] Integrate proposal approval/rejection with OpenCode native approve/reject flow semantics.
 - [ ] Create a full TUI demo script (with video) for `plan -> build -> review` with `/resume`, `/pause`, and `/evolve` (deferred, not planned now).
