@@ -31,5 +31,5 @@ Sandbox visibility rule:
 - If sandbox/bubblewrap visibility prevents direct verification (for example host-home paths such as `~/.config/*`), do not claim direct verification.
 - Explicitly state the limitation and provide host-side verification commands a human can run.
 
-If checks pass without blocking issues, proactively add:
+If the overall assessment is "looks good" with no medium/high-risk findings (none or only low-risk/nit findings), proactively add:
 - `Suggested commit:` with one Conventional Commit message (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`) aligned to the reviewed changes.

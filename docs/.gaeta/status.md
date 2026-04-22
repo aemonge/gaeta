@@ -95,6 +95,8 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Tightened permission policy in `opencode.json`: `plan` now denies `todowrite`, build-agent bash allows are scoped to explicit test/build commands, and overlapping wildcard families are avoided.
 - Added a docs-only Fence wishlist direction: keep current Linux-first `bwrap` + optional `landrun` backend as default, and revisit Fence only when macOS support becomes an active priority with explicit parity/rollback gates.
 - Added `docs/fence-wishlist.md` as a dedicated one-page reference for Fence revisit triggers, decision gates, and explicit out-of-scope boundaries.
+- Added explicit policy language in `GAETA.md` that `docs/.gaeta/` is intentionally committed in git for cross-machine workflow continuity.
+- Tightened reviewer policy so `/review` must always provide `Suggested commit:` when overall assessment is "looks good" with none/low-risk findings only, and added matching guard assertions.
 
 ## In progress
 
@@ -166,3 +168,5 @@ Implement MCP config/validation slice for the low-risk baseline: document concre
 - MCP expansion policy is low-risk first: baseline servers are `context7`, `playwright`, and `postgres`; Semgrep is optional; Perplexity API is not integrated in gaeta.
 - Permission policy keeps global fallback permissive by operator choice, while agent-level rules prioritize explicit allowlists and avoid overlapping wildcard families.
 - Fence backend exploration is deferred by default; treat it as a future portability option (primarily macOS-driven) rather than a near-term Linux backend replacement.
+- `docs/.gaeta/` is intentionally committed and versioned in git as shared project workflow state, not local-only runtime cache.
+- `/review` commit suggestion policy is now explicit: if assessment is "looks good" and findings are none/low-risk only, always include one Conventional Commit `Suggested commit:` line.

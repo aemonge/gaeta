@@ -104,5 +104,6 @@ At session end:
 ## Source of Truth
 
 - Canonical workflow control plane: `docs/.gaeta/*`.
+- `docs/.gaeta/` is intentionally committed to git so workflow state stays consistent across machines.
 - Template path migration guide: `docs/migration-docs-opencode.md`.
 - `PROJECT.md` is a dashboard, not a second source of truth.

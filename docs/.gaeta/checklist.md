@@ -81,6 +81,8 @@
 - [x] Normalize `tests/doctor.bats` shell style so `shellharden --check` passes in `make lint`.
 - [x] Add `gaeta status` and `/status` to show phase, next step, pending sprint items, and blockers.
 - [x] Extend `make legacy-clean` to remove stale legacy role prompts (`architect`, `implementer`, `handoff-writer`) from `~/.config/gaeta/agents`.
+- [x] Add explicit policy note that `docs/.gaeta/` is intentionally committed for cross-machine workflow continuity.
+- [x] Require `/review` to always emit `Suggested commit:` when overall assessment is "looks good" with only none/low-risk findings.
 
 ## Current
 

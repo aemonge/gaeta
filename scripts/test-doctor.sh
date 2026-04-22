@@ -328,6 +328,8 @@ assert "fallback commands: `gaeta proposal approve . latest`" in evolve_text, ev
 review_text = (commands_dir / "review.md").read_text(encoding="utf-8")
 assert "Suggested commit:" in review_text, review_text
 assert "Conventional Commit" in review_text, review_text
+assert "overall assessment is \"looks good\"" in review_text, review_text
+assert "only low-risk/nit findings" in review_text, review_text
 assert "sandbox/bubblewrap visibility prevents direct verification" in review_text, review_text
 assert "host-side verification commands" in review_text, review_text
 assert "Workflow writeback rule:" in review_text, review_text
@@ -339,6 +341,7 @@ assert "host-side verification is required" in pause_text, pause_text
 review_agent_text = (agents_dir / "review.md").read_text(encoding="utf-8")
 assert "do not claim direct verification" in review_agent_text, review_agent_text
 assert "write it into `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md`" in review_agent_text, review_agent_text
+assert "always include `Suggested commit:`" in review_agent_text, review_agent_text
 
 build_agent_text = (agents_dir / "build.md").read_text(encoding="utf-8")
 assert "host-side verification commands" in build_agent_text, build_agent_text
