@@ -114,7 +114,7 @@ TUI Config Precedence (automatic):
   4. No TUI config binding (OpenCode defaults)
 
 Directory Projection (automatic):
-  - Targets: agents/, commands/, modes/, plugins/
+  - Targets: agents/, commands/, modes/, plugins/, plugin/
   - Strategy: mirror projection (not symlink)
   - Merge mode: opencode base overlaid by gaeta content
   - Structured files (*.json, *.yaml, *.yml) merge recursively by key
@@ -517,6 +517,7 @@ materialize_projection_files() {
   local active_commands="$PROJECTED_COMMANDS_DIR"
   local active_modes="$PROJECTED_MODES_DIR"
   local active_plugins="$PROJECTED_PLUGINS_DIR"
+  local active_plugin="$PROJECTED_PLUGIN_DIR"
 
   if [[ "${GAETA_META_ENABLED:-0}" -ne 1 ]]; then
     CUSTOM_CONFIG="$active_opencode"
@@ -590,6 +591,13 @@ materialize_projection_files() {
       "opencode_source": "$(json_escape "${OPENCODE_PLUGINS_DIR}")",
       "generated": "$(json_escape "${active_plugins}")",
       "present": $([[ -n "${active_plugins}" ]] && printf 'true' || printf 'false')
+    },
+    "plugin": {
+      "source_mode": "$(json_escape "${PROJECTED_PLUGIN_SOURCE}")",
+      "gaeta_source": "$(json_escape "${GAETA_PLUGIN_DIR}")",
+      "opencode_source": "$(json_escape "${OPENCODE_PLUGIN_DIR}")",
+      "generated": "$(json_escape "${active_plugin}")",
+      "present": $([[ -n "${active_plugin}" ]] && printf 'true' || printf 'false')
     }
   }
 }
@@ -641,6 +649,12 @@ prepare_projection_artifacts() {
   fi
   PROJECTED_PLUGINS_DIR="$MATERIALIZED_DIR_PATH"
   PROJECTED_PLUGINS_SOURCE="$MATERIALIZED_DIR_SOURCE"
+
+  if ! materialize_projection_directory "plugin" "$GAETA_PLUGIN_DIR" "$OPENCODE_PLUGIN_DIR" "${MERGED_CONFIG_DIR}/plugin" "${GAETA_PROJECTION_DIR}/plugin"; then
+    return 1
+  fi
+  PROJECTED_PLUGIN_DIR="$MATERIALIZED_DIR_PATH"
+  PROJECTED_PLUGIN_SOURCE="$MATERIALIZED_DIR_SOURCE"
 
   materialize_projection_files "$CUSTOM_CONFIG" "$TUI_CONFIG"
   return 0
@@ -2553,6 +2567,8 @@ DOCTOR_HELP
   local opencode_modes_dir="${opencode_config_dir}/modes"
   local gaeta_plugins_dir="${gaeta_config_dir}/plugins"
   local opencode_plugins_dir="${opencode_config_dir}/plugins"
+  local gaeta_plugin_dir="${gaeta_config_dir}/plugin"
+  local opencode_plugin_dir="${opencode_config_dir}/plugin"
 
   local projection_dir="${target_project}/.gaeta/projection"
   local projection_meta="${projection_dir}/projection.json"
@@ -2563,6 +2579,7 @@ DOCTOR_HELP
   local commands_mode
   local modes_mode
   local plugins_mode
+  local plugin_mode
 
   opencode_mode=$(detect_file_source_mode "$gaeta_opencode_json" "$opencode_opencode_json")
   tui_mode=$(detect_file_source_mode "$gaeta_tui_json" "$opencode_tui_json")
@@ -2570,6 +2587,7 @@ DOCTOR_HELP
   commands_mode=$(detect_dir_source_mode "$gaeta_commands_dir" "$opencode_commands_dir")
   modes_mode=$(detect_dir_source_mode "$gaeta_modes_dir" "$opencode_modes_dir")
   plugins_mode=$(detect_dir_source_mode "$gaeta_plugins_dir" "$opencode_plugins_dir")
+  plugin_mode=$(detect_dir_source_mode "$gaeta_plugin_dir" "$opencode_plugin_dir")
 
   if ! determine_tty_session_mode; then
     return 1
@@ -2652,6 +2670,7 @@ DOCTOR_HELP
   print_doctor_check "commands" "ok" "mode=${commands_mode} gaeta=${gaeta_commands_dir} opencode=${opencode_commands_dir}"
   print_doctor_check "modes" "ok" "mode=${modes_mode} gaeta=${gaeta_modes_dir} opencode=${opencode_modes_dir}"
   print_doctor_check "plugins" "ok" "mode=${plugins_mode} gaeta=${gaeta_plugins_dir} opencode=${opencode_plugins_dir}"
+  print_doctor_check "plugin" "ok" "mode=${plugin_mode} gaeta=${gaeta_plugin_dir} opencode=${opencode_plugin_dir}"
 
   if [[ "$DOCTOR_JSON" -ne 1 && "$DOCTOR_VERBOSE" -eq 1 ]]; then
     printf '\n'
@@ -2680,6 +2699,7 @@ DOCTOR_HELP
   local projected_commands_dir="${projection_dir}/commands"
   local projected_modes_dir="${projection_dir}/modes"
   local projected_plugins_dir="${projection_dir}/plugins"
+  local projected_plugin_dir="${projection_dir}/plugin"
 
   if [[ "$opencode_mode" != "none" && ! -f "$projected_opencode_json" ]]; then
     print_doctor_check "projected opencode" "warn" "expected but missing: ${projected_opencode_json}"
@@ -2738,6 +2758,74 @@ PY
       fi
     fi
     print_doctor_check "core agent profiles" "$core_agent_state" "$core_agent_details"
+
+    local monitor_local_state="warn"
+    local monitor_local_details=""
+    if ! command -v python3 >/dev/null 2>&1; then
+      monitor_local_state="warn"
+      monitor_local_details="python3 missing; cannot validate OpenCode Monitor local-only HTTP server settings"
+    else
+      local monitor_local_check
+      if monitor_local_check=$(
+        python3 - "$projected_opencode_json" "${OPENCODE_HTTP_ENABLED:-}" "${OPENCODE_SERVER_HOST:-}" <<'PY'
+import json
+import pathlib
+import sys
+
+
+def is_truthy(value):
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+path = pathlib.Path(sys.argv[1])
+http_enabled_env = sys.argv[2]
+server_host_env = sys.argv[3]
+
+payload = json.loads(path.read_text(encoding="utf-8"))
+server = payload.get("server") if isinstance(payload, dict) else None
+hostname = ""
+if isinstance(server, dict):
+    raw = server.get("hostname")
+    if isinstance(raw, str):
+        hostname = raw.strip()
+
+if server_host_env and server_host_env != "127.0.0.1":
+    print(
+        "warn\tOPENCODE_SERVER_HOST is set to "
+        + server_host_env
+        + "; use OPENCODE_SERVER_HOST=127.0.0.1 for local-only OpenCode Monitor mode"
+    )
+elif hostname == "localhost":
+    print(
+        "ok\tHTTP server enabled via server.hostname=localhost (loopback); keep OPENCODE_SERVER_HOST=127.0.0.1 for local-only monitor access"
+    )
+elif hostname and hostname != "127.0.0.1":
+    print(
+        "warn\tserver.hostname="
+        + hostname
+        + " is not local-only; use server.hostname=localhost for OpenCode Monitor local mode"
+    )
+elif is_truthy(http_enabled_env):
+    print(
+        "ok\tHTTP server enabled via OPENCODE_HTTP_ENABLED; keep OPENCODE_SERVER_HOST=127.0.0.1 for local-only monitor access"
+    )
+else:
+    print(
+        "warn\tHTTP server mode not detected; set server.hostname=localhost in ~/.config/gaeta/opencode.json (or ~/.config/opencode/opencode.json), or export OPENCODE_HTTP_ENABLED=true; keep OPENCODE_SERVER_HOST=127.0.0.1"
+    )
+PY
+      ); then
+        monitor_local_state="${monitor_local_check%%$'\t'*}"
+        monitor_local_details="${monitor_local_check#*$'\t'}"
+      else
+        monitor_local_state="warn"
+        monitor_local_details="failed to validate OpenCode Monitor local-only HTTP server settings"
+      fi
+    fi
+    if [[ "$monitor_local_state" == "warn" ]]; then
+      ((warn_count += 1))
+    fi
+    print_doctor_check "opencode monitor local-only" "$monitor_local_state" "$monitor_local_details"
   fi
 
   if [[ "$tui_mode" != "none" && ! -f "$projected_tui_json" ]]; then
@@ -2773,6 +2861,13 @@ PY
     ((warn_count += 1))
   elif [[ -d "$projected_plugins_dir" ]]; then
     print_doctor_check "projected plugins" "ok" "$projected_plugins_dir"
+  fi
+
+  if [[ "$plugin_mode" != "none" && ! -d "$projected_plugin_dir" ]]; then
+    print_doctor_check "projected plugin" "warn" "expected but missing: ${projected_plugin_dir}"
+    ((warn_count += 1))
+  elif [[ -d "$projected_plugin_dir" ]]; then
+    print_doctor_check "projected plugin" "ok" "$projected_plugin_dir"
   fi
 
   if [[ "$DOCTOR_JSON" -ne 1 && "$DOCTOR_VERBOSE" -eq 1 ]]; then
@@ -3599,15 +3694,19 @@ GAETA_MODES_DIR="${HOME}/.config/gaeta/modes"
 OPENCODE_MODES_DIR="${HOME}/.config/opencode/modes"
 GAETA_PLUGINS_DIR="${HOME}/.config/gaeta/plugins"
 OPENCODE_PLUGINS_DIR="${HOME}/.config/opencode/plugins"
+GAETA_PLUGIN_DIR="${HOME}/.config/gaeta/plugin"
+OPENCODE_PLUGIN_DIR="${HOME}/.config/opencode/plugin"
 MERGED_CONFIG_DIR=""
 PROJECTED_AGENTS_DIR=""
 PROJECTED_COMMANDS_DIR=""
 PROJECTED_MODES_DIR=""
 PROJECTED_PLUGINS_DIR=""
+PROJECTED_PLUGIN_DIR=""
 PROJECTED_AGENTS_SOURCE="none"
 PROJECTED_COMMANDS_SOURCE="none"
 PROJECTED_MODES_SOURCE="none"
 PROJECTED_PLUGINS_SOURCE="none"
+PROJECTED_PLUGIN_SOURCE="none"
 
 PROJECT_DIR=""
 OPENCODE_ARGS=()
@@ -4190,6 +4289,11 @@ fi
 if [[ -n "$PROJECTED_PLUGINS_DIR" && -d "$PROJECTED_PLUGINS_DIR" ]]; then
   BWRAP_CMD+=(--ro-bind "$PROJECTED_PLUGINS_DIR" /home/gaeta/.config/opencode/plugins)
   info "Using projected plugins directory: ${PROJECTED_PLUGINS_DIR}"
+fi
+
+if [[ -n "$PROJECTED_PLUGIN_DIR" && -d "$PROJECTED_PLUGIN_DIR" ]]; then
+  BWRAP_CMD+=(--ro-bind "$PROJECTED_PLUGIN_DIR" /home/gaeta/.config/opencode/plugin)
+  info "Using projected plugin directory: ${PROJECTED_PLUGIN_DIR}"
 fi
 
 BWRAP_CMD+=(--chdir "$SANDBOX_WORKDIR")

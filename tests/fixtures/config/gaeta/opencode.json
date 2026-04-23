@@ -1,4 +1,7 @@
 {
+  "server": {
+    "hostname": "localhost"
+  },
   "agent": {
     "review": {
       "permission": {

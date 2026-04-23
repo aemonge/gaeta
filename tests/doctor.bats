@@ -59,12 +59,16 @@ assert "skipped" in sandbox_rows["sandbox execution"]["details"], sandbox_rows
 
 projection_rows = {row["label"]: row for row in checks["projection_artifacts"]}
 assert projection_rows["core agent profiles"]["status"] == "ok", projection_rows
+assert projection_rows["opencode monitor local-only"]["status"] == "ok", projection_rows
+assert "localhost" in projection_rows["opencode monitor local-only"]["details"], projection_rows
+assert projection_rows["projected plugin"]["status"] == "ok", projection_rows
 
 projected_config = json.loads((project / ".gaeta" / "projection" / "opencode.json").read_text(encoding="utf-8"))
 projected_tui = json.loads((project / ".gaeta" / "projection" / "tui.json").read_text(encoding="utf-8"))
 
 assert projected_config["base_only"] == "from_opencode", projected_config
 assert projected_config["gaeta_only"] == "from_gaeta", projected_config
+assert projected_config["server"]["hostname"] == "localhost", projected_config
 assert projected_config["nested"]["from_base"] is True, projected_config
 assert projected_config["nested"]["overridden"] == "gaeta", projected_config
 assert "plan" in projected_config["agent"], projected_config
@@ -74,8 +78,50 @@ assert projected_config["agent"]["review"]["permission"]["edit"] == "deny", proj
 assert projected_tui["theme"] == "gaeta", projected_tui
 assert projected_tui["keybinds"]["open"] == "ctrl+o", projected_tui
 assert projected_tui["keybinds"]["quit"] == "ctrl+q", projected_tui
+
+projected_plugin = project / ".gaeta" / "projection" / "plugin" / "opencode-monitor.js"
+assert projected_plugin.exists(), projected_plugin
 PY
 
+  [ "$status" -eq 0 ]
+}
+
+@test "doctor warns when monitor local-only server mode is not configured" {
+  local disabled_home="${TEST_ROOT}/home-disabled"
+  mkdir -p "${disabled_home}/.config"
+  cp -R "${FIXTURE_ROOT}/config/opencode" "${disabled_home}/.config/opencode"
+  cp -R "${FIXTURE_ROOT}/config/gaeta" "${disabled_home}/.config/gaeta"
+
+  run python3 - "${disabled_home}/.config/gaeta/opencode.json" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload.pop("server", None)
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+  [ "$status" -eq 0 ]
+
+  local json_path="${TEST_ROOT}/doctor-monitor-warn.json"
+  HOME="$disabled_home" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat \
+    "$GAETA_BIN" doctor --json "$TEST_PROJECT" >"$json_path"
+
+  run python3 - "$json_path" <<'PY'
+import json
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+projection_rows = {row["label"]: row for row in payload["checks"]["projection_artifacts"]}
+monitor_row = projection_rows["opencode monitor local-only"]
+
+assert payload["status"] == "warn", payload
+assert monitor_row["status"] == "warn", monitor_row
+assert "server.hostname=localhost" in monitor_row["details"], monitor_row
+assert "OPENCODE_SERVER_HOST=127.0.0.1" in monitor_row["details"], monitor_row
+PY
   [ "$status" -eq 0 ]
 }
 

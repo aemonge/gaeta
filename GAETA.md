@@ -88,6 +88,13 @@ At session end:
 - Search-enhancer integrations should favor lower-risk, standard MCP providers; do not integrate Perplexity API directly into gaeta.
 - Advisory-source policy: search-enhancer and optional Semgrep outputs are advisory; implementation decisions should still be grounded in repo state, tests, and primary docs.
 
+## OpenCode Monitor Local-Only Policy
+
+- For `@actualyze/opencode-monitor`, keep server advertisement local-only: `OPENCODE_SERVER_HOST=127.0.0.1`.
+- Enable OpenCode HTTP mode with `server.hostname: "localhost"` in gaeta/OpenCode config so attach/browser flows work without exposing non-loopback interfaces.
+- Environment fallback remains supported: `OPENCODE_HTTP_ENABLED=true`.
+- Verify startup includes `HTTP server listening on http://localhost:<port>` before using monitor attach/browser actions.
+
 ## Backup Policy
 
 - `gaeta backup` remains supported (not deprecated) as a hard-save guardrail for workflow continuity.

@@ -8,6 +8,9 @@ Merge rule: recursive key-level overlay (`opencode` base + `gaeta` override).
 
 ```json
 {
+  "server": {
+    "hostname": "127.0.0.1"
+  },
   "model": "openai/gpt-5.3-codex",
   "base_only": "from_opencode",
   "nested": {
@@ -33,6 +36,9 @@ Merge rule: recursive key-level overlay (`opencode` base + `gaeta` override).
 
 ```json
 {
+  "server": {
+    "hostname": "localhost"
+  },
   "gaeta_only": "from_gaeta",
   "nested": {
     "overridden": "gaeta"
@@ -51,6 +57,9 @@ Merge rule: recursive key-level overlay (`opencode` base + `gaeta` override).
 
 ```json
 {
+  "server": {
+    "hostname": "localhost"
+  },
   "model": "openai/gpt-5.3-codex",
   "base_only": "from_opencode",
   "gaeta_only": "from_gaeta",
@@ -85,3 +94,4 @@ Merge rule: recursive key-level overlay (`opencode` base + `gaeta` override).
 - Overlapping keys are overridden by gaeta.
 - Nested maps are merged recursively.
 - Agent map contains merged `plan`, `build`, and `review` entries.
+- For OpenCode Monitor attach/browser flows, use `server.hostname: "localhost"` so the HTTP server starts while remaining loopback-only.

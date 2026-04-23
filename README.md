@@ -63,6 +63,32 @@ Not for:
 6) /pause
 ```
 
+## OpenCode Monitor (local-only)
+
+If you use `@actualyze/opencode-monitor`, keep gaeta/OpenCode in local-only mode while still enabling HTTP attach/browser support:
+
+```bash
+export OPENCODE_SERVER_HOST=127.0.0.1
+```
+
+Enable OpenCode HTTP server mode in config (gaeta-compatible projection source is `~/.config/gaeta/opencode.json`):
+
+```json
+{
+  "server": {
+    "hostname": "localhost"
+  }
+}
+```
+
+Upstream monitor docs may reference `~/.config/opencode/config.json`; in gaeta workflows prefer `~/.config/gaeta/opencode.json` (or `~/.config/opencode/opencode.json`) so projection and doctor checks stay consistent.
+
+- Why `localhost`: OpenCode starts HTTP only when hostname differs from `127.0.0.1`; `localhost` still binds loopback.
+- Fallback: `OPENCODE_HTTP_ENABLED=true opencode`
+- Verify at startup: `HTTP server listening on http://localhost:<port>`
+- If missing, OpenCode Monitor attach/browser actions report `Server Unavailable`.
+- Ensure plugin is installed at `~/.config/opencode/plugin/opencode-monitor.js` (`oc-mon --install-plugin`); gaeta now projects this path into sandbox sessions.
+
 ## Task tooling
 
 - Canonical task state lives in `docs/.gaeta/checklist.md`.

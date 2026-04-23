@@ -97,6 +97,9 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Added `docs/fence-wishlist.md` as a dedicated one-page reference for Fence revisit triggers, decision gates, and explicit out-of-scope boundaries.
 - Added explicit policy language in `GAETA.md` that `docs/.gaeta/` is intentionally committed in git for cross-machine workflow continuity.
 - Tightened reviewer policy so `/review` must always provide `Suggested commit:` when overall assessment is "looks good" with none/low-risk findings only, and added matching guard assertions.
+- Added OpenCode Monitor local-only operator guidance: keep `OPENCODE_SERVER_HOST=127.0.0.1` and enable OpenCode HTTP server mode via `server.hostname=localhost` (or `OPENCODE_HTTP_ENABLED=true` fallback).
+- `gaeta doctor` now includes an `opencode monitor local-only` projection check that warns when HTTP server mode is not detected or when non-local monitor host advertisement is configured.
+- Added projection + sandbox bind support for singular OpenCode plugin path (`~/.config/opencode/plugin/` -> `.gaeta/projection/plugin/` -> `/home/gaeta/.config/opencode/plugin`) so `opencode-monitor` plugin discovery works under gaeta.
 
 ## In progress
 
@@ -170,3 +173,5 @@ Implement MCP config/validation slice for the low-risk baseline: document concre
 - Fence backend exploration is deferred by default; treat it as a future portability option (primarily macOS-driven) rather than a near-term Linux backend replacement.
 - `docs/.gaeta/` is intentionally committed and versioned in git as shared project workflow state, not local-only runtime cache.
 - `/review` commit suggestion policy is now explicit: if assessment is "looks good" and findings are none/low-risk only, always include one Conventional Commit `Suggested commit:` line.
+- OpenCode Monitor compatibility policy is local-only by default: `OPENCODE_SERVER_HOST=127.0.0.1` plus HTTP server enablement via `server.hostname=localhost` in projected OpenCode config (or `OPENCODE_HTTP_ENABLED=true` as fallback).
+- Keep both OpenCode plugin directory conventions projected for compatibility: `plugins/` (existing) and `plugin/` (required by `@actualyze/opencode-monitor` install scripts).

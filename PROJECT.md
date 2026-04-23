@@ -41,6 +41,7 @@
 - Legacy `gaeta proposal` subcommands remain supported until `/evolve` parity, then should be removed immediately (no deprecation window).
 - `README.md` now includes a public-friendly quickstart, audience fit, status caveats, and a short operator flow for new users.
 - MCP expansion policy now prefers a low-risk baseline (`context7`, `playwright`, `postgres`), keeps Semgrep optional, and excludes direct Perplexity API integration.
+- OpenCode Monitor compatibility now documents local-only policy: set `OPENCODE_SERVER_HOST=127.0.0.1` and enable OpenCode HTTP with `server.hostname: "localhost"` (or `OPENCODE_HTTP_ENABLED=true`).
 
 ## Next Step
 

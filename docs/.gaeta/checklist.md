@@ -83,6 +83,8 @@
 - [x] Extend `make legacy-clean` to remove stale legacy role prompts (`architect`, `implementer`, `handoff-writer`) from `~/.config/gaeta/agents`.
 - [x] Add explicit policy note that `docs/.gaeta/` is intentionally committed for cross-machine workflow continuity.
 - [x] Require `/review` to always emit `Suggested commit:` when overall assessment is "looks good" with only none/low-risk findings.
+- [x] Add OpenCode Monitor local-only compatibility guidance (`OPENCODE_SERVER_HOST=127.0.0.1`) plus doctor validation for HTTP server mode (`server.hostname=localhost`).
+- [x] Add OpenCode Monitor plugin projection compatibility for `~/.config/opencode/plugin/` so monitor discovery works in gaeta sandbox sessions.
 
 ## Current
 
