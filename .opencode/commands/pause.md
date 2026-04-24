@@ -3,13 +3,13 @@ description: Capture pause snapshot for next resume
 agent: build
 ---
 Resolve gaeta launcher in this order:
-1. `./gaeta` when present in current project root.
-2. `gaeta` from PATH.
+1. `gaeta` from PATH.
+2. `./gaeta` when present in current project root.
 3. `~/.config/gaeta/bin/gaeta` as per-user fallback launcher.
 
-If no launcher exists, stop and report: `gaeta not found` (recommended fix: run `make build` in gaeta repo to install `~/.config/gaeta/bin/gaeta` and/or add it to PATH).
+If no launcher exists, continue without invoking gaeta and update `docs/.gaeta/pause.md` directly (include a note that launcher resolution failed and host-side setup is required).
 
-Run `<gaeta-launcher> pause`.
+When a launcher is resolved, run `<gaeta-launcher> pause`.
 
 If command fails due to uninitialized workflow files, run `<gaeta-launcher> init .` and retry.
 

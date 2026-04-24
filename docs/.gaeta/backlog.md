@@ -23,3 +23,4 @@
 - [x] Decide whether to remove legacy `gaeta proposal` subcommands once `/evolve` command UX is finalized (remove immediately after parity; no deprecation window).
 - [ ] Validate a low-risk non-Perplexity search MCP candidate and document advisory-use boundaries.
 - [ ] Evaluate Semgrep MCP integration using pinned/self-hosted setup guidance before enabling by default.
+- [ ] Add project-level persistence guidance (or command support) for operator allow/reject permission choices so interactive approvals are not lost across sessions/projects.

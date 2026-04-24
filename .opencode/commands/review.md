@@ -3,8 +3,8 @@ description: Inspect, validate, and describe manual verification
 agent: review
 ---
 Resolve gaeta launcher in this order:
-1. `./gaeta` when present in current project root.
-2. `gaeta` from PATH.
+1. `gaeta` from PATH.
+2. `./gaeta` when present in current project root.
 3. `~/.config/gaeta/bin/gaeta` as per-user fallback launcher.
 
 If no launcher exists, continue review checks without gaeta invocation and include a note.

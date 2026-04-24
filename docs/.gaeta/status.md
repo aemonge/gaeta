@@ -100,6 +100,9 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Added OpenCode Monitor local-only operator guidance: keep `OPENCODE_SERVER_HOST=127.0.0.1` and enable OpenCode HTTP server mode via `server.hostname=localhost` (or `OPENCODE_HTTP_ENABLED=true` fallback).
 - `gaeta doctor` now includes an `opencode monitor local-only` projection check that warns when HTTP server mode is not detected or when non-local monitor host advertisement is configured.
 - Added projection + sandbox bind support for singular OpenCode plugin path (`~/.config/opencode/plugin/` -> `.gaeta/projection/plugin/` -> `/home/gaeta/.config/opencode/plugin`) so `opencode-monitor` plugin discovery works under gaeta.
+- Normalized slash-command launcher precedence to `gaeta` (PATH) -> `./gaeta` -> `~/.config/gaeta/bin/gaeta` across command templates for better cross-project behavior.
+- Updated `/pause` command template fallback behavior to continue with direct `docs/.gaeta/pause.md` updates when no launcher can be resolved, instead of hard-stop reporting.
+- Captured a new backlog follow-up for project-level persistence of interactive allow/reject permission choices so prompt decisions are not lost across sessions/projects.
 
 ## In progress
 
@@ -175,3 +178,5 @@ Implement MCP config/validation slice for the low-risk baseline: document concre
 - `/review` commit suggestion policy is now explicit: if assessment is "looks good" and findings are none/low-risk only, always include one Conventional Commit `Suggested commit:` line.
 - OpenCode Monitor compatibility policy is local-only by default: `OPENCODE_SERVER_HOST=127.0.0.1` plus HTTP server enablement via `server.hostname=localhost` in projected OpenCode config (or `OPENCODE_HTTP_ENABLED=true` as fallback).
 - Keep both OpenCode plugin directory conventions projected for compatibility: `plugins/` (existing) and `plugin/` (required by `@actualyze/opencode-monitor` install scripts).
+- Slash-command launcher policy is now PATH-first (`gaeta`) to avoid project-local path coupling in cross-project sessions.
+- `/pause` is intentionally resilient when launcher resolution fails: continue with manual pause-document update flow and include setup guidance.

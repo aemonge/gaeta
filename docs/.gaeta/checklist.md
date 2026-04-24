@@ -85,6 +85,7 @@
 - [x] Require `/review` to always emit `Suggested commit:` when overall assessment is "looks good" with only none/low-risk findings.
 - [x] Add OpenCode Monitor local-only compatibility guidance (`OPENCODE_SERVER_HOST=127.0.0.1`) plus doctor validation for HTTP server mode (`server.hostname=localhost`).
 - [x] Add OpenCode Monitor plugin projection compatibility for `~/.config/opencode/plugin/` so monitor discovery works in gaeta sandbox sessions.
+- [x] Normalize slash-command launcher precedence to PATH-first (`gaeta` before `./gaeta`) and make `/pause` degrade gracefully when no launcher is found.
 
 ## Current
 

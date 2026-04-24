@@ -619,6 +619,8 @@ expected = {
 for name, marker in expected.items():
     text = (commands / name).read_text(encoding="utf-8")
     assert marker in text, (name, marker)
+    assert "1. `gaeta` from PATH." in text, name
+    assert "2. `./gaeta` when present in current project root." in text, name
     assert "~/.config/gaeta/bin/gaeta" in text, name
 
 evolve_text = (commands / "evolve.md").read_text(encoding="utf-8")
@@ -635,6 +637,8 @@ assert "must add it to `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md`" i
 
 pause_text = (commands / "pause.md").read_text(encoding="utf-8")
 assert "host-side verification is required" in pause_text, pause_text
+assert "continue without invoking gaeta" in pause_text, pause_text
+assert "update `docs/.gaeta/pause.md` directly" in pause_text, pause_text
 
 review_agent_text = (agents_dir / "review.md").read_text(encoding="utf-8")
 assert "do not claim direct verification" in review_agent_text, review_agent_text
