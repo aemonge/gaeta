@@ -103,6 +103,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Normalized slash-command launcher precedence to `gaeta` (PATH) -> `./gaeta` -> `~/.config/gaeta/bin/gaeta` across command templates for better cross-project behavior.
 - Updated `/pause` command template fallback behavior to continue with direct `docs/.gaeta/pause.md` updates when no launcher can be resolved, instead of hard-stop reporting.
 - Captured a new backlog follow-up for project-level persistence of interactive allow/reject permission choices so prompt decisions are not lost across sessions/projects.
+- Updated `.opencode/agents/plan.md` to support operator-mediated Perplexity deep-search requests via a fixed `Perplexity Request` output contract and a copy-paste prompt template.
 
 ## In progress
 
@@ -180,3 +181,4 @@ Implement MCP config/validation slice for the low-risk baseline: document concre
 - Keep both OpenCode plugin directory conventions projected for compatibility: `plugins/` (existing) and `plugin/` (required by `@actualyze/opencode-monitor` install scripts).
 - Slash-command launcher policy is now PATH-first (`gaeta`) to avoid project-local path coupling in cross-project sessions.
 - `/pause` is intentionally resilient when launcher resolution fails: continue with manual pause-document update flow and include setup guidance.
+- Plan-agent external research policy is now explicit: when web context is needed, emit a structured operator-facing `Perplexity Request`; treat returned findings as advisory (not source of truth).
