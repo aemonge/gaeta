@@ -9,12 +9,23 @@ Resolve gaeta launcher in this order:
 
 If no launcher exists, stop and report: `gaeta not found` (recommended fix: run `make build` in gaeta repo to install `~/.config/gaeta/bin/gaeta` and/or add it to PATH).
 
-Run `<gaeta-launcher> status .`.
+Run these commands in order:
+
+1. `<gaeta-launcher> profile sync --dry-run .`
+2. `<gaeta-launcher> serve status .`
+3. `<gaeta-launcher> status .`
 
 If output indicates project is not initialized, run `<gaeta-launcher> init .` first.
 
-Then reply with the same concise status snapshot fields:
+Then reply with a Gaeta cockpit snapshot including:
+- gaeta profile,
 - current phase,
-- next step,
-- top pending sprint items,
-- blockers.
+- sandbox status,
+- direnv mode,
+- artifact server status and URL,
+- sem status/freshness,
+- expected profile plugins,
+- configured plugin specs,
+- missing curated plugins,
+- last handoff/status file,
+- next suggested command.

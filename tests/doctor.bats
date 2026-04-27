@@ -24,7 +24,7 @@ teardown() {
   local json_path="${TEST_ROOT}/doctor.json"
 
   HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat \
-    "$GAETA_BIN" doctor --json "$TEST_PROJECT" >"$json_path"
+    "$GAETA_BIN" doctor --no-strict --json "$TEST_PROJECT" >"$json_path"
 
   run python3 - "$json_path" "$TEST_PROJECT" <<'PY'
 import json
@@ -36,7 +36,7 @@ project = pathlib.Path(sys.argv[2])
 payload = json.loads(doctor_path.read_text(encoding="utf-8"))
 
 assert payload["summary"]["fail"] == 0, payload
-assert payload["status"] == "ok", payload
+assert payload["status"] in {"ok", "warn"}, payload
 
 checks = payload["checks"]
 for key in [
@@ -46,6 +46,7 @@ for key in [
     "projection_artifacts",
     "sandbox_check",
     "workflow_files",
+    "safety_checks",
 ]:
     assert len(checks[key]) > 0, (key, payload)
 
@@ -106,7 +107,7 @@ PY
 
   local json_path="${TEST_ROOT}/doctor-monitor-warn.json"
   HOME="$disabled_home" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat \
-    "$GAETA_BIN" doctor --json "$TEST_PROJECT" >"$json_path"
+    "$GAETA_BIN" doctor --no-strict --json "$TEST_PROJECT" >"$json_path"
 
   run python3 - "$json_path" <<'PY'
 import json
@@ -126,13 +127,13 @@ PY
 }
 
 @test "doctor human output is quiet by default and expanded with --verbose" {
-  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor "$TEST_PROJECT"
+  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --no-strict "$TEST_PROJECT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"gaeta doctor"* ]]
   [[ "$output" == *"summary:"* ]]
   [[ "$output" != *"Dependencies"* ]]
 
-  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --verbose "$TEST_PROJECT"
+  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --no-strict --verbose "$TEST_PROJECT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Dependencies"* ]]
   [[ "$output" == *"Summary"* ]]
@@ -167,7 +168,7 @@ printf '%s\n' "GAETA_DOCTOR_SANDBOX_OK"
 SH
   chmod +x "${fake_bin_dir}/bwrap"
 
-  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true PATH="${fake_bin_dir}:$PATH" "$GAETA_BIN" doctor --verbose "$TEST_PROJECT"
+  run env HOME="$TEST_HOME" OPENCODE_BIN=/bin/true PATH="${fake_bin_dir}:$PATH" "$GAETA_BIN" doctor --no-strict --verbose "$TEST_PROJECT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"sandbox execution"* ]]
   [[ "$output" != *"--agent: invalid option"* ]]
@@ -233,6 +234,8 @@ SH
   run env HOME="$TEST_HOME" "$GAETA_BIN" init "$uninit_project"
   [ "$status" -eq 0 ]
   [[ "$output" == *"initialized workflow files"* ]]
+  [[ "$output" == *"profile: recommended"* ]]
+  [[ "$output" == *"gaeta profile sync"* ]]
 
   run python3 - "$uninit_project" <<'PY'
 import pathlib
@@ -246,6 +249,12 @@ required = [
     "docs/.gaeta/status.md",
     "docs/.gaeta/checklist.md",
     "docs/.gaeta/backlog.md",
+    ".mcp.json.example",
+    ".gaeta/profile.json",
+    "opencode.json",
+    ".gaeta/profile.lock.json",
+    ".opencode/gaeta.generated.json",
+    ".opencode/gaeta-profile.md",
 ]
 for rel in required:
     path = project / rel
@@ -272,10 +281,293 @@ PY
   [[ "$output" == *"gaeta resume"* ]]
 }
 
+@test "init accepts explicit profiles and profile command reports active profile" {
+  local profile_project="${TEST_ROOT}/profile-project"
+  mkdir -p "$profile_project"
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" init --profile minimal "$profile_project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"profile: minimal"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile "$profile_project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"active: minimal"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile set experimental "$profile_project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"active: experimental"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile "$profile_project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"active: experimental"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile list
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"minimal"* ]]
+  [[ "$output" == *"recommended"* ]]
+  [[ "$output" == *"experimental"* ]]
+}
+
+@test "profile sync dry-run previews without writing lockfile" {
+  local sync_project="${TEST_ROOT}/sync-dry-run-project"
+  mkdir -p "$sync_project"
+  run env HOME="$TEST_HOME" "$GAETA_BIN" init --profile recommended --no-install "$sync_project"
+  [ "$status" -eq 0 ]
+
+  cat >"$sync_project/opencode.json" <<'JSON'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "opencode-monitor"
+  ]
+}
+JSON
+
+  local before_hash
+  before_hash="$(
+    python3 - "$sync_project/opencode.json" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+print(hashlib.sha256(path.read_bytes()).hexdigest())
+PY
+  )"
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile sync --dry-run "$sync_project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"mode: dry-run"* ]]
+  [[ "$output" == *"missing expected:"* ]]
+  [[ "$output" == *"next: gaeta profile sync --install"* ]]
+
+  local after_hash
+  after_hash="$(
+    python3 - "$sync_project/opencode.json" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+print(hashlib.sha256(path.read_bytes()).hexdigest())
+PY
+  )"
+
+  [ "$before_hash" = "$after_hash" ]
+
+  [ ! -f "$sync_project/.gaeta/profile.lock.json" ]
+  [ ! -f "$sync_project/.opencode/gaeta.generated.json" ]
+}
+
+@test "profile sync writes lockfile and generated profile context" {
+  cat >"$TEST_PROJECT/opencode.json" <<'JSON'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "opencode-monitor"
+  ]
+}
+JSON
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile sync "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"mode: sync"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile sync --install "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"note: restart OpenCode for plugin changes to load"* ]]
+  [[ "$output" == *"unresolved manual installs:"* ]]
+
+  run python3 - "$TEST_PROJECT" <<'PY'
+import json
+import pathlib
+import sys
+
+project = pathlib.Path(sys.argv[1])
+lock_path = project / ".gaeta" / "profile.lock.json"
+generated_json = project / ".opencode" / "gaeta.generated.json"
+generated_md = project / ".opencode" / "gaeta-profile.md"
+
+assert lock_path.exists(), lock_path
+assert generated_json.exists(), generated_json
+assert generated_md.exists(), generated_md
+
+payload = json.loads(lock_path.read_text(encoding="utf-8"))
+assert payload["profile"] == "recommended", payload
+expected = set(payload["plugins"]["expected_ids"])
+assert "ocx" in expected, expected
+assert "envsitter-guard" in expected, expected
+assert "opencode-ignore" in expected, expected
+assert "openspec" in expected, expected
+assert "plannotator" in expected, expected
+assert "micode" in expected, expected
+assert "opencode-agents" in expected, expected
+assert "notify" in expected, expected
+assert "opencode-browser" not in expected, expected
+assert "opencode-skills" not in expected, expected
+
+policy_blocked = set(payload["policy"]["blocked_plugin_ids"])
+for blocked in ["google-ai-search", "telegram-bot", "swarm-plugin", "agent-of-empires", "devcontainers"]:
+    assert blocked in policy_blocked, payload
+
+project_config = json.loads((project / "opencode.json").read_text(encoding="utf-8"))
+specs = project_config["plugin"]
+assert "opencode-monitor" in specs, specs
+assert "opencode-plugin-openspec" in specs, specs
+assert "@plannotator/opencode" in specs, specs
+assert "micode" in specs, specs
+assert "opencode-notify" in specs, specs
+assert "opencode-ignore" in specs, specs
+
+manual_ids = set(payload["plugins"]["manual_ids"])
+assert "envsitter-guard" in manual_ids, manual_ids
+assert "opencode-agents" in manual_ids, manual_ids
+
+missing_ids = set(payload["plugins"]["missing_ids"])
+assert "opencode-ignore" not in missing_ids, missing_ids
+
+generated = json.loads(generated_json.read_text(encoding="utf-8"))
+assert generated["gaeta"]["profile"] == "recommended", generated
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "profile sync supports experimental and minimal policy boundaries" {
+  local exp_project="${TEST_ROOT}/sync-exp-project"
+  mkdir -p "$exp_project"
+  run env HOME="$TEST_HOME" "$GAETA_BIN" init --profile experimental "$exp_project"
+  [ "$status" -eq 0 ]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile sync "$exp_project"
+  [ "$status" -eq 0 ]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile sync --install "$exp_project"
+  [ "$status" -eq 0 ]
+
+  run python3 - "$exp_project/.gaeta/profile.lock.json" <<'PY'
+import json
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+expected = set(payload["plugins"]["expected_ids"])
+for plugin in [
+    "opencode-browser",
+    "opencode-skills",
+    "froggy",
+    "opencode-mem",
+    "opencode-roadmap",
+    "opencode-sessions",
+    "opencode-canvas",
+    "opencode-agent-tmux",
+]:
+    assert plugin in expected, (plugin, expected)
+
+specs = set(payload["plugins"]["configured_specs"])
+assert "opencode-agent-browser" in specs, specs
+assert "opencode-mem" in specs, specs
+PY
+  [ "$status" -eq 0 ]
+
+  local min_project="${TEST_ROOT}/sync-min-project"
+  mkdir -p "$min_project"
+  run env HOME="$TEST_HOME" "$GAETA_BIN" init --profile minimal "$min_project"
+  [ "$status" -eq 0 ]
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile sync "$min_project"
+  [ "$status" -eq 0 ]
+
+  run python3 - "$min_project/.gaeta/profile.lock.json" <<'PY'
+import json
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+assert payload["profile"] == "minimal", payload
+assert payload["plugins"]["expected_ids"] == [], payload
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "profile sync --no-notify skips optional notify projection" {
+  local no_notify_project="${TEST_ROOT}/sync-no-notify-project"
+  mkdir -p "$no_notify_project"
+  run env HOME="$TEST_HOME" "$GAETA_BIN" init --profile recommended --no-install "$no_notify_project"
+  [ "$status" -eq 0 ]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile sync --install --no-notify "$no_notify_project"
+  [ "$status" -eq 0 ]
+
+  run python3 - "$no_notify_project/opencode.json" "$no_notify_project/.gaeta/profile.lock.json" <<'PY'
+import json
+import pathlib
+import sys
+
+project_config = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+assert "opencode-notify" not in project_config.get("plugin", []), project_config
+
+lock_payload = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+assert "notify" in lock_payload["plugins"]["optional_skipped_ids"], lock_payload
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "serve lifecycle uses localhost and artifacts root" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" serve "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"status: running"* ]]
+  [[ "$output" == *"host: 127.0.0.1"* ]]
+  [[ "$output" == *"root: $TEST_PROJECT/.gaeta/artifacts"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" serve status "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gaeta serve"* ]]
+  [[ "$output" == *"host: 127.0.0.1"* ]]
+
+  run env HOME="$TEST_HOME" "$GAETA_BIN" serve stop "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"status: stopped"* ]]
+}
+
+@test "doctor strict fails on warnings" {
+  local strict_home="${TEST_ROOT}/strict-home"
+  mkdir -p "${strict_home}/.config"
+  cp -R "${FIXTURE_ROOT}/config/opencode" "${strict_home}/.config/opencode"
+  cp -R "${FIXTURE_ROOT}/config/gaeta" "${strict_home}/.config/gaeta"
+
+  run python3 - "${strict_home}/.config/gaeta/opencode.json" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload.pop("server", None)
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+  [ "$status" -eq 0 ]
+
+  run env HOME="$strict_home" "$GAETA_BIN" profile sync --install "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+
+  run env HOME="$strict_home" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --strict "$TEST_PROJECT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unresolved:"* ]]
+}
+
 @test "status shows phase next pending and blockers" {
+  run env HOME="$TEST_HOME" "$GAETA_BIN" profile sync "$TEST_PROJECT"
+  [ "$status" -eq 0 ]
+
   run env HOME="$TEST_HOME" "$GAETA_BIN" status "$TEST_PROJECT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"gaeta status"* ]]
+  [[ "$output" == *"gaeta profile: recommended"* ]]
+  [[ "$output" == *"direnv mode: off"* ]]
+  [[ "$output" == *"artifact server:"* ]]
+  [[ "$output" == *"sem status:"* ]]
+  [[ "$output" == *"expected profile plugins:"* ]]
+  [[ "$output" == *"missing profile plugins:"* ]]
+  [[ "$output" == *"next suggested command:"* ]]
   [[ "$output" == *"phase: Phase X"* ]]
   [[ "$output" == *"next step: Implement sync behavior."* ]]
   [[ "$output" == *"top pending sprint items:"* ]]
@@ -608,6 +900,13 @@ repo = pathlib.Path(sys.argv[1])
 commands = repo / ".opencode" / "commands"
 agents_dir = repo / ".opencode" / "agents"
 expected = {
+    "brainstorm.md": "agent: plan",
+    "plan.md": "agent: plan",
+    "build.md": "agent: build",
+    "doctor.md": "agent: review",
+    "serve.md": "agent: build",
+    "design.md": "agent: build",
+    "handoff.md": "agent: plan",
     "pause.md": "agent: build",
     "go.md": "agent: plan",
     "review.md": "agent: review",
@@ -619,6 +918,9 @@ expected = {
 for name, marker in expected.items():
     text = (commands / name).read_text(encoding="utf-8")
     assert marker in text, (name, marker)
+
+for name in ["pause.md", "go.md", "review.md", "evolve.md", "resume.md", "status.md", "doctor.md", "serve.md"]:
+    text = (commands / name).read_text(encoding="utf-8")
     assert "1. `gaeta` from PATH." in text, name
     assert "2. `./gaeta` when present in current project root." in text, name
     assert "~/.config/gaeta/bin/gaeta" in text, name
@@ -630,10 +932,34 @@ assert "fallback commands: `gaeta proposal approve . latest`" in evolve_text, ev
 review_text = (commands / "review.md").read_text(encoding="utf-8")
 assert "Suggested commit:" in review_text, review_text
 assert "Conventional Commit" in review_text, review_text
+assert "changed-symbol observations" in review_text, review_text
 assert "sandbox/bubblewrap visibility prevents direct verification" in review_text, review_text
 assert "host-side verification commands" in review_text, review_text
 assert "Workflow writeback rule:" in review_text, review_text
 assert "must add it to `docs/.gaeta/checklist.md` or `docs/.gaeta/backlog.md`" in review_text, review_text
+
+status_text = (commands / "status.md").read_text(encoding="utf-8")
+assert "profile sync --dry-run" in status_text, status_text
+assert "Gaeta cockpit snapshot" in status_text, status_text
+assert "gaeta profile" in status_text, status_text
+assert "artifact server status" in status_text, status_text
+assert "sem status/freshness" in status_text, status_text
+
+doctor_text = (commands / "doctor.md").read_text(encoding="utf-8")
+assert "doctor --strict" in doctor_text, doctor_text
+assert "profile sync --dry-run" in doctor_text, doctor_text
+assert "profile sync --install" in doctor_text, doctor_text
+
+plan_text = (commands / "plan.md").read_text(encoding="utf-8")
+assert "Sem/AST context" in plan_text, plan_text
+assert "sem-based outline/diff" in plan_text, plan_text
+
+design_text = (commands / "design.md").read_text(encoding="utf-8")
+assert "no browser automation required" in design_text, design_text
+
+handoff_text = (commands / "handoff.md").read_text(encoding="utf-8")
+assert "current profile" in handoff_text, handoff_text
+assert "sem observations" in handoff_text, handoff_text
 
 pause_text = (commands / "pause.md").read_text(encoding="utf-8")
 assert "host-side verification is required" in pause_text, pause_text
@@ -658,6 +984,15 @@ assert "Projection safety matrix (gaeta policy)" in architecture_text, architect
 assert "mirror-only" in architecture_text, architecture_text
 assert "Linux/macOS portability notes" in architecture_text, architecture_text
 assert "GAETA_DOCTOR_SKIP_SANDBOX=1 ./gaeta doctor --verbose ." in architecture_text, architecture_text
+
+for rel in [
+    "docs/opencode-integration.md",
+    "docs/opencode-profiles.md",
+    "docs/opencode-plugins.md",
+    "docs/artifacts.md",
+]:
+    path = repo / rel
+    assert path.exists(), path
 
 project_text = (repo / "PROJECT.md").read_text(encoding="utf-8")
 assert "Linux/macOS portability notes are documented in `docs/architecture.md`." in project_text, project_text

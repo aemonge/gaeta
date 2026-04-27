@@ -104,6 +104,37 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 - Updated `/pause` command template fallback behavior to continue with direct `docs/.gaeta/pause.md` updates when no launcher can be resolved, instead of hard-stop reporting.
 - Captured a new backlog follow-up for project-level persistence of interactive allow/reject permission choices so prompt decisions are not lost across sessions/projects.
 - Updated `.opencode/agents/plan.md` to support operator-mediated Perplexity deep-search requests via a fixed `Perplexity Request` output contract and a copy-paste prompt template.
+- Reframed gaeta as a TUI-first OpenCode distro: primary CLI surface is now `gaeta`, `init`, `doctor`, `profile`, `serve`, and `upgrade` (legacy workflow commands remain supported as compatibility paths).
+- Added profile metadata workflow under `.gaeta/profile.json` with supported profiles `minimal`, `recommended` (default), and `experimental`.
+- Extended `gaeta init` to support `--profile` and scaffold `.mcp.json.example`, `.gaeta/profile.json`, `.gaeta/artifacts/index.html`, and safe `.gitignore` defaults.
+- Added `gaeta profile` subcommands (`show`, `list`, `set`) for profile inspection/switching.
+- Added `gaeta serve` lifecycle (`start`, `status`, `stop`) with localhost defaults, random free port, `.gaeta/server.json` metadata, and repo-root serving guardrail.
+- Hardened `gaeta doctor` with `--strict` and safety checks for active profile detection, `.mcp.json` tracking, ignore-policy entries, token-pattern scans (without value disclosure), direnv gating, and artifact-root safety.
+- Added TUI command pack entries: `/brainstorm`, `/plan`, `/build`, `/doctor`, `/serve`, `/design`, `/handoff`.
+- Added docs: `docs/opencode-integration.md`, `docs/opencode-profiles.md`, `docs/opencode-plugins.md`, and `docs/artifacts.md`.
+- Expanded fixtures/tests for init profile defaults, profile command behavior, serve lifecycle, strict-doctor behavior, and new command-pack coverage.
+- Added `gaeta profile sync` with `--dry-run` and `--install` modes under the existing `gaeta profile` surface.
+- Added profile runtime lock and projection artifacts: `.gaeta/profile.lock.json`, `.opencode/gaeta.generated.json`, and `.opencode/gaeta-profile.md`.
+- Added curated profile plugin-state computation (expected/configured/missing/blocked/optional) with hard-blocked plugin enforcement.
+- Updated `gaeta status` to report cockpit-visible profile/plugin/artifact/sem state and suggest next commands.
+- Updated `gaeta doctor` to check profile sync freshness, lockfile/plugin mismatch state, and generated profile-context staleness.
+- Updated slash command bodies (`/status`, `/doctor`, `/plan`, `/review`, `/handoff`) to surface profile sync and sem context in TUI workflows.
+- Added test coverage for `gaeta profile sync` dry-run/apply behavior, profile lock/context generation, profile boundary expectations, and richer command template semantics.
+- Updated `gaeta init` behavior to run `gaeta profile sync --install` by default so freshly initialized projects immediately project profile runtime context and lock state.
+- Added `gaeta init --no-install` as an explicit opt-out for non-install bootstrap flows.
+- Added curated plugin registry at `packs/opencode/plugins.json` with explicit install typing (`opencode-plugin`, `executable`, `manual`) and hard-blocked plugin list.
+- `gaeta profile sync --install` now merges verified curated npm plugin specs into project `opencode.json` (`plugin` array) and preserves existing entries such as `opencode-monitor`.
+- Added `gaeta profile sync --no-notify` to skip optional notify projection; default behavior auto-projects notify for recommended/experimental profiles.
+- Profile lock schema now records plugin ids/specs in a projection-oriented format (`expected_ids`, `configured_specs`, `manual_ids`, `missing_ids`, `optional_skipped_ids`, `blocked_detected_specs`).
+- Doctor profile-sync check now warns explicitly when recommended profile is not fully projected and suggests `gaeta profile sync --dry-run` and `gaeta profile sync --install`.
+- Extended tests to validate dry-run no-write behavior, real `opencode.json` plugin projection/merge, notify opt-out, and profile boundary expectations.
+- `gaeta doctor` is now strict-by-default and supports `--no-strict` when warning-tolerant checks are required.
+- Profile sync now emits suggested `npm install -g ...` commands for manual/executable pending plugins, and doctor surfaces those suggestions in profile-sync warnings.
+- Profile sync guidance no longer emits guessed `npm install -g <plugin-id>` commands for unresolved manual plugins; unresolved items are now explicitly flagged as unverified package-name gaps.
+- Doctor profile-sync warning now includes both verified install suggestions and an `unresolved` segment for manual plugins without verified package names.
+- Promoted `opencode-ignore` to verified `opencode-plugin` projection (`opencode-ignore`) in curated registry so sync/install now writes it into `opencode.json` plugin specs.
+- Kept `envsitter-guard` and `opencode-agents` in manual/unresolved state with explicit notes; `opencode-agents` is documented as non-`plugin[]` package semantics.
+- Updated test assertions to require `opencode-ignore` projection in recommended profile and to remove it from manual/missing plugin expectations.
 
 ## In progress
 
@@ -115,7 +146,7 @@ Build gaeta as an OpenCode-safe wrapper with a gaeta-native workflow control pla
 
 ## Next step
 
-Implement MCP config/validation slice for the low-risk baseline: document concrete server examples and add `gaeta doctor` checks for malformed MCP entries.
+Add deterministic/pinned OCX-backed installer execution to `gaeta profile sync --install` once installer command contracts are verified.
 
 ## Decisions
 
@@ -182,3 +213,14 @@ Implement MCP config/validation slice for the low-risk baseline: document concre
 - Slash-command launcher policy is now PATH-first (`gaeta`) to avoid project-local path coupling in cross-project sessions.
 - `/pause` is intentionally resilient when launcher resolution fails: continue with manual pause-document update flow and include setup guidance.
 - Plan-agent external research policy is now explicit: when web context is needed, emit a structured operator-facing `Perplexity Request`; treat returned findings as advisory (not source of truth).
+- gaeta vNext command policy is now explicit: keep CLI small and TUI-first, with legacy workflow subcommands supported as compatibility escape hatches.
+- Profile metadata canonical location is `.gaeta/profile.json`; default profile is `recommended`.
+- `gaeta serve` defaults are local-safe by policy: root `.gaeta/artifacts`, bind `127.0.0.1`, dynamic free port, and server metadata in `.gaeta/server.json`.
+- Doctor strict-mode policy is explicit: `gaeta doctor --strict` fails on warnings/failures and must never print secret values.
+- Profile runtime state policy now includes lock/projection artifacts as first-class operator signals: `.gaeta/profile.lock.json` and `.opencode/gaeta-profile.*`.
+- `gaeta profile sync` default behavior is non-destructive runtime synchronization (no arbitrary plugin install); explicit `--install` emits curated install guidance only.
+- `gaeta init` now defaults to install-sync behavior to reduce post-init manual steps and make profile state immediately visible inside OpenCode.
+- Verified plugin projection policy now separates exact known npm specs (auto-project) from unresolved plugin package names (manual), and never fakes manual installs as successful.
+- Strict diagnostics policy now defaults to fail-on-warning for `gaeta doctor`; operators can opt out explicitly with `--no-strict`.
+- Manual plugin install guidance policy now forbids guessed package-name install commands in diagnostics output.
+- Curated plugin registry promotion policy is evidence-driven: move entries from manual to `opencode-plugin` only when package spec is authoritative.

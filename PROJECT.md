@@ -42,10 +42,21 @@
 - `README.md` now includes a public-friendly quickstart, audience fit, status caveats, and a short operator flow for new users.
 - MCP expansion policy now prefers a low-risk baseline (`context7`, `playwright`, `postgres`), keeps Semgrep optional, and excludes direct Perplexity API integration.
 - OpenCode Monitor compatibility now documents local-only policy: set `OPENCODE_SERVER_HOST=127.0.0.1` and enable OpenCode HTTP with `server.hostname: "localhost"` (or `OPENCODE_HTTP_ENABLED=true`).
+- gaeta vNext direction is now TUI-first: CLI is airlock/launcher (`gaeta`, `init`, `doctor`, `profile`, `serve`, `upgrade`) and most workflow actions happen via OpenCode slash commands.
+- Profile system now supports `minimal`, `recommended` (default), and `experimental` metadata under `.gaeta/profile.json`.
+- `gaeta init` now accepts `--profile` and scaffolds `.mcp.json.example` plus `.gaeta/artifacts/index.html`.
+- `gaeta profile` now supports profile inspection/list/set operations.
+- `gaeta profile` now supports `sync` (`--dry-run`, `--install`) with curated plugin-state reporting.
+- Profile runtime state now projects into `.gaeta/profile.lock.json` plus OpenCode-visible `.opencode/gaeta.generated.json` and `.opencode/gaeta-profile.md`.
+- `gaeta serve` now supports local artifact lifecycle (`start`, `status`, `stop`) with metadata in `.gaeta/server.json`.
+- `gaeta doctor` now supports `--strict` and adds safety checks for ignore policy, tracked `.mcp.json`, secret-pattern scanning, profile consistency, direnv gating, and artifact safety.
+- `gaeta status` now surfaces cockpit-visible profile/plugin/artifact/sem state and next suggested command guidance.
+- Added TUI command templates: `/brainstorm`, `/plan`, `/build`, `/doctor`, `/serve`, `/design`, `/handoff`.
+- Added docs: `docs/opencode-integration.md`, `docs/opencode-profiles.md`, `docs/opencode-plugins.md`, `docs/artifacts.md`.
 
 ## Next Step
 
-Implement MCP config/validation slice for the low-risk baseline: document concrete server examples and add `gaeta doctor` checks for malformed MCP entries.
+Implement `gaeta upgrade` as a backup/diff-safe profile template re-projection flow.
 
 ## Resume Prompt
 

@@ -10,6 +10,8 @@ set -euo pipefail
 readonly PROGRAM_NAME="gaeta"
 readonly PROGRAM_VERSION="0.9.0"
 readonly OPENCODE_BIN_DEFAULT="/usr/bin/opencode"
+readonly DEFAULT_PROFILE="recommended"
+readonly -a GAETA_PROFILES=("minimal" "recommended" "experimental")
 GAETA_SELF_PATH="$(realpath "$0" 2>/dev/null || printf '%s' "$0")"
 readonly GAETA_SELF_PATH
 
@@ -26,21 +28,32 @@ gaeta 0.9.0
 Safe OpenCode wrapper using bubblewrap with optional Landlock defense-in-depth.
 
 Usage:
-  gaeta init [--force] [PROJECT_DIR]
-  gaeta doctor [PROJECT_DIR]
-  gaeta status [PROJECT_DIR]
-  gaeta go [--show] [--format user|agent] [PROJECT_DIR]
-  gaeta backup [PROJECT_DIR]
-  gaeta resume [--show] [PROJECT_DIR]
-  gaeta r [--show] [PROJECT_DIR]
-  gaeta pause [PROJECT_DIR]
-  gaeta proposal <create|list|approve|reject> [ARGS...]
-  gaeta tasks [TASK_ARGS...]
+  gaeta init [--force] [--profile minimal|recommended|experimental] [PROJECT_DIR]
+  gaeta doctor [--strict] [PROJECT_DIR]
+  gaeta profile [PROJECT_DIR]
+  gaeta profile list
+  gaeta profile set <minimal|recommended|experimental> [PROJECT_DIR]
+  gaeta profile sync [--dry-run] [--install] [--profile <name>] [PROJECT_DIR]
+  gaeta serve [PROJECT_DIR]
+  gaeta serve status [PROJECT_DIR]
+  gaeta serve stop [PROJECT_DIR]
+  gaeta upgrade [PROJECT_DIR]
+  gaeta status [PROJECT_DIR]                 # compatibility workflow command
+  gaeta go [--show] [--format user|agent] [PROJECT_DIR]  # compatibility workflow command
+  gaeta backup [PROJECT_DIR]                 # compatibility workflow command
+  gaeta resume [--show] [PROJECT_DIR]        # compatibility workflow command
+  gaeta r [--show] [PROJECT_DIR]             # compatibility workflow command
+  gaeta pause [PROJECT_DIR]                  # compatibility workflow command
+  gaeta proposal <create|list|approve|reject> [ARGS...]  # compatibility workflow command
+  gaeta tasks [TASK_ARGS...]                 # compatibility workflow command
   gaeta [options] [PROJECT_DIR] [-- [OPENCODE_ARGS...]]
 
 Options:
-  init                  Initialize gaeta workflow files in a project
-  doctor                 Run gaeta self-inspection checks
+  init                  Initialize gaeta workflow and profile files
+  doctor                 Run gaeta diagnostics and safety checks
+  profile                Show/list/set active gaeta profile
+  serve                  Manage local artifact server lifecycle
+  upgrade                Re-project profile templates (future-safe no-op)
   status                 Show phase, next step, pending sprint items, blockers
   go                     Rotate plan/build/review kickoff bundle
   backup                 Write a hard-save backup of workflow files
@@ -133,7 +146,20 @@ Paranoid Mode (Defense-in-Depth):
     - Linux kernel 6.7+ for network syscall restrictions
 
 Examples:
-  gaeta init              # scaffold PROJECT.md, GAETA.md, docs/.gaeta/* in $PWD
+  gaeta init              # scaffold workflow files with recommended profile
+  gaeta init --profile minimal
+  gaeta init --profile recommended
+  gaeta init --profile experimental
+  gaeta doctor --strict   # fail on warnings
+  gaeta profile           # show current profile
+  gaeta profile list      # list supported profiles
+  gaeta profile set minimal
+  gaeta profile sync --dry-run
+  gaeta profile sync --install
+  gaeta serve             # serve .gaeta/artifacts on localhost
+  gaeta serve status
+  gaeta serve stop
+  gaeta upgrade           # reserved for template re-projection
   gaeta init ../repo      # initialize another project directory
   gaeta init --force .    # overwrite existing workflow files
   gaeta doctor             # inspect gaeta config and projection health
@@ -764,15 +790,617 @@ require_project_initialized() {
   return 1
 }
 
+profile_exists() {
+  local candidate="$1"
+  local p
+  for p in "${GAETA_PROFILES[@]}"; do
+    if [[ "$p" == "$candidate" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+resolve_profile_file_path() {
+  local project_dir="$1"
+  printf '%s/.gaeta/profile.json' "$project_dir"
+}
+
+detect_profile_name() {
+  local project_dir="$1"
+  local profile_file
+  profile_file="$(resolve_profile_file_path "$project_dir")"
+
+  if [[ -f "$profile_file" ]] && command -v python3 >/dev/null 2>&1; then
+    local parsed
+    if parsed=$(python3 - "$profile_file" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    print("")
+    raise SystemExit(0)
+
+name = payload.get("name") if isinstance(payload, dict) else ""
+print(name if isinstance(name, str) else "")
+PY
+); then
+      if profile_exists "$parsed"; then
+        printf '%s' "$parsed"
+        return 0
+      fi
+    fi
+  fi
+
+  printf '%s' "$DEFAULT_PROFILE"
+}
+
+write_profile_metadata() {
+  local project_dir="$1"
+  local profile_name="$2"
+
+  if ! profile_exists "$profile_name"; then
+    error "unsupported profile: ${profile_name}"
+    return 1
+  fi
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    error "python3 is required for profile metadata"
+    return 1
+  fi
+
+  local profile_file
+  profile_file="$(resolve_profile_file_path "$project_dir")"
+
+  python3 - "$profile_file" "$profile_name" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+name = sys.argv[2]
+
+catalog = {
+    "minimal": {
+        "description": "Gaeta-owned safe baseline with no third-party plugin dependencies.",
+        "plugins": [],
+        "direnv": "off",
+    },
+    "recommended": {
+        "description": "Default curated distro profile with vetted plugin integration guidance.",
+        "plugins": [
+            "ocx",
+            "envsitter-guard",
+            "opencode-ignore",
+            "openspec",
+            "plannotator",
+            "micode",
+            "opencode-agents",
+            "notify",
+        ],
+        "direnv": "off",
+    },
+    "experimental": {
+        "description": "High-variance profile extending recommended with browser/skills/memory/session tooling.",
+        "plugins": [
+            "ocx",
+            "envsitter-guard",
+            "opencode-ignore",
+            "openspec",
+            "plannotator",
+            "micode",
+            "opencode-agents",
+            "notify",
+            "opencode-browser",
+            "opencode-skills",
+            "froggy",
+            "opencode-mem",
+            "opencode-roadmap",
+            "opencode-sessions",
+            "opencode-canvas",
+            "opencode-agent-tmux",
+        ],
+        "direnv": "off",
+    },
+}
+
+banned = [
+    "google-ai-search",
+    "telegram-bot",
+    "swarm-plugin",
+    "agent-of-empires",
+    "devcontainers",
+]
+
+profile = catalog[name]
+payload = {
+    "schema_version": 1,
+    "name": name,
+    "description": profile["description"],
+    "plugins": profile["plugins"],
+    "direnv": profile["direnv"],
+    "banned_plugins": banned,
+}
+
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+PY
+}
+
+print_profile_catalog() {
+  cat <<'PROFILE_CATALOG'
+minimal      safe baseline, no third-party plugin dependency
+recommended  default curated distro profile
+experimental high-variance extensions (browser/skills/memory/session)
+PROFILE_CATALOG
+}
+
+run_profile_sync_command() {
+  local target_project="$PWD"
+  local dry_run=0
+  local install_mode=0
+  local assume_yes=0
+  local include_notify=1
+  local profile_override=""
+  local -a positionals=()
+
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'PROFILE_SYNC_HELP'
+Usage:
+  gaeta profile sync [--dry-run] [--install] [--profile <name>] [--yes] [--no-notify] [PROJECT_DIR]
+
+Behavior:
+  - computes expected/configured/missing/blocked plugin state for active profile
+  - writes .gaeta/profile.lock.json and .opencode/gaeta-profile.* (unless --dry-run)
+  - never installs hard-blocked plugins
+  - only performs installation actions when --install is passed
+PROFILE_SYNC_HELP
+    return 0
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run)
+        dry_run=1
+        ;;
+      --install)
+        install_mode=1
+        ;;
+      --yes)
+        assume_yes=1
+        ;;
+      --no-notify)
+        include_notify=0
+        ;;
+      --notify)
+        include_notify=1
+        ;;
+      --profile)
+        if [[ $# -lt 2 ]]; then
+          error "profile sync --profile requires one value"
+          return 1
+        fi
+        profile_override="$2"
+        shift
+        ;;
+      --profile=*)
+        profile_override="${1#--profile=}"
+        ;;
+      -*)
+        error "unknown profile sync option: $1"
+        return 1
+        ;;
+      *)
+        positionals+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  if [[ ${#positionals[@]} -gt 1 ]]; then
+    error "profile sync accepts at most one optional PROJECT_DIR"
+    return 1
+  fi
+  if [[ ${#positionals[@]} -eq 1 ]]; then
+    target_project="${positionals[0]}"
+  fi
+
+  if [[ ! -d "$target_project" ]]; then
+    error "profile sync project directory does not exist: ${target_project}"
+    return 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    error "python3 is required for profile sync"
+    return 1
+  fi
+
+  target_project="$(realpath "$target_project")"
+  if [[ -n "$profile_override" ]] && ! profile_exists "$profile_override"; then
+    error "unsupported profile: ${profile_override}"
+    return 1
+  fi
+
+  local active_profile
+  active_profile="$(detect_profile_name "$target_project")"
+  if [[ -n "$profile_override" ]]; then
+    active_profile="$profile_override"
+  fi
+
+  if [[ "$dry_run" -eq 1 && "$install_mode" -eq 1 ]]; then
+    error "profile sync --dry-run and --install are mutually exclusive"
+    return 1
+  fi
+
+  if [[ "$dry_run" -eq 0 && -n "$profile_override" ]]; then
+    if ! write_profile_metadata "$target_project" "$active_profile"; then
+      return 1
+    fi
+  fi
+
+  local ocx_available=0
+  if command -v ocx >/dev/null 2>&1; then
+    ocx_available=1
+  fi
+
+  local registry_path=""
+  local -a registry_candidates=()
+  if [[ -n "${GAETA_PLUGIN_REGISTRY:-}" ]]; then
+    registry_candidates+=("${GAETA_PLUGIN_REGISTRY}")
+  fi
+  registry_candidates+=(
+    "$PWD/packs/opencode/plugins.json"
+    "$(dirname "$GAETA_SELF_PATH")/packs/opencode/plugins.json"
+    "$(dirname "$GAETA_SELF_PATH")/../packs/opencode/plugins.json"
+    "$HOME/.config/gaeta/packs/opencode/plugins.json"
+  )
+
+  local candidate
+  for candidate in "${registry_candidates[@]}"; do
+    if [[ -f "$candidate" ]]; then
+      registry_path="$(realpath "$candidate")"
+      break
+    fi
+  done
+
+  if [[ -z "$registry_path" ]]; then
+    error "profile plugin registry missing (set GAETA_PLUGIN_REGISTRY or ensure packs/opencode/plugins.json exists)"
+    return 1
+  fi
+
+  if ! python3 - "$target_project" "$active_profile" "$dry_run" "$install_mode" "$assume_yes" "$HOME" "$ocx_available" "$registry_path" "$PROGRAM_VERSION" "$include_notify" <<'PY'
+import datetime
+import json
+import pathlib
+import shutil
+import sys
+
+
+def normalize_plugin_id(name: str) -> str:
+    value = name.strip().lower()
+    for suffix in (".js", ".mjs", ".cjs", ".ts", ".json"):
+        if value.endswith(suffix):
+            value = value[: -len(suffix)]
+    for ch in ("_", " "):
+        value = value.replace(ch, "-")
+    while "--" in value:
+        value = value.replace("--", "-")
+    return value.strip("-")
+
+project = pathlib.Path(sys.argv[1]).resolve()
+profile = sys.argv[2]
+dry_run = sys.argv[3] == "1"
+install_mode = sys.argv[4] == "1"
+assume_yes = sys.argv[5] == "1"
+home = pathlib.Path(sys.argv[6]).expanduser()
+ocx_available = sys.argv[7] == "1"
+registry_path = pathlib.Path(sys.argv[8])
+gaeta_version = sys.argv[9]
+include_notify = sys.argv[10] == "1"
+
+registry = json.loads(registry_path.read_text(encoding="utf-8"))
+blocked = {normalize_plugin_id(item) for item in registry.get("blocked", []) if isinstance(item, str)}
+plugins_registry = registry.get("plugins", {}) if isinstance(registry, dict) else {}
+
+expected_rules = []
+for plugin_id, raw in plugins_registry.items():
+    if not isinstance(raw, dict):
+        continue
+    if profile not in raw.get("profiles", []):
+        continue
+    if raw.get("optional", False) and plugin_id == "notify" and not include_notify:
+        continue
+    item = dict(raw)
+    item["id"] = plugin_id
+    expected_rules.append(item)
+
+expected_rules.sort(key=lambda row: row["id"])
+expected_ids = [row["id"] for row in expected_rules]
+optional_skipped = ["notify"] if (not include_notify and "notify" in plugins_registry and profile in plugins_registry["notify"].get("profiles", [])) else []
+
+project_opencode_path = project / "opencode.json"
+project_payload = {}
+project_json_exists = project_opencode_path.exists()
+if project_json_exists:
+    try:
+        project_payload = json.loads(project_opencode_path.read_text(encoding="utf-8"))
+    except Exception:
+        project_payload = {}
+if not isinstance(project_payload, dict):
+    project_payload = {}
+
+plugin_specs = project_payload.get("plugin")
+if not isinstance(plugin_specs, list):
+    plugin_specs = []
+
+def dedupe_specs(rows: list[str]) -> list[str]:
+    seen = set()
+    out = []
+    for row in rows:
+        if not isinstance(row, str):
+            continue
+        spec = row.strip()
+        if not spec:
+            continue
+        if spec in seen:
+            continue
+        seen.add(spec)
+        out.append(spec)
+    return out
+
+
+current_specs = dedupe_specs(plugin_specs)
+spec_to_id = {}
+for pid, raw in plugins_registry.items():
+    if not isinstance(raw, dict):
+        continue
+    install = raw.get("install", {})
+    if isinstance(install, dict) and install.get("type") == "opencode-plugin":
+        spec = install.get("spec")
+        if isinstance(spec, str) and spec.strip():
+            spec_to_id[spec.strip()] = pid
+
+configured_ids = set()
+configured_specs = []
+for spec in current_specs:
+    configured_specs.append(spec)
+    mapped = spec_to_id.get(spec)
+    if mapped:
+        configured_ids.add(mapped)
+    else:
+        normalized = normalize_plugin_id(spec)
+        if normalized in plugins_registry:
+            configured_ids.add(normalized)
+
+if ocx_available or shutil.which("ocx"):
+    configured_ids.add("ocx")
+
+blocked_detected = []
+for spec in current_specs:
+    normalized = normalize_plugin_id(spec)
+    if normalized in blocked:
+        blocked_detected.append(spec)
+blocked_detected = sorted(set(blocked_detected))
+
+auto_install_specs = []
+manual_plugins = []
+manual_suggestions = []
+manual_unverified = []
+missing_ids = []
+
+for rule in expected_rules:
+    pid = rule["id"]
+    install = rule.get("install", {}) if isinstance(rule.get("install"), dict) else {}
+    install_type = install.get("type", "manual")
+    label = rule.get("label", pid)
+
+    is_configured = pid in configured_ids
+
+    if install_type == "opencode-plugin":
+        spec = install.get("spec")
+        if isinstance(spec, str) and spec.strip():
+            auto_install_specs.append(spec.strip())
+            if spec.strip() in current_specs:
+                is_configured = True
+        else:
+            install_type = "manual"
+
+    elif install_type == "executable":
+        command = install.get("command", pid)
+        if isinstance(command, str) and command.strip() and shutil.which(command.strip()):
+            is_configured = True
+        else:
+            is_configured = False
+
+    if not is_configured:
+        missing_ids.append(pid)
+
+    if install_type in {"manual", "executable"}:
+        if install_type == "executable":
+            command = install.get("command", pid)
+            if isinstance(command, str) and command.strip() and not shutil.which(command.strip()):
+                manual_plugins.append(f"{pid}: executable `{command.strip()}` not found")
+                manual_suggestions.append(f"npm install -g {command.strip()}  # verify source before install")
+        else:
+            notes = rule.get("notes", "manual setup required")
+            manual_plugins.append(f"{pid}: {notes}")
+            manual_unverified.append(f"{pid}: no verified npm package name; check plugin docs/registry before install")
+
+projected_specs = list(current_specs)
+added_specs = []
+if install_mode:
+    for spec in auto_install_specs:
+        if spec not in projected_specs:
+            projected_specs.append(spec)
+            added_specs.append(spec)
+
+    if blocked_detected:
+        projected_specs = [spec for spec in projected_specs if spec not in blocked_detected]
+
+projected_specs = dedupe_specs(projected_specs)
+
+configured_after_ids = set(configured_ids)
+for spec in projected_specs:
+    mapped = spec_to_id.get(spec)
+    if mapped:
+        configured_after_ids.add(mapped)
+    else:
+        normalized = normalize_plugin_id(spec)
+        if normalized in plugins_registry:
+            configured_after_ids.add(normalized)
+
+missing_after = [pid for pid in expected_ids if pid not in configured_after_ids]
+
+timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+
+lock_payload = {
+    "schema_version": 2,
+    "generated_at": timestamp,
+    "gaeta_version": gaeta_version,
+    "profile": profile,
+    "direnv_mode": "off",
+    "install": {
+        "requested": install_mode,
+        "assume_yes": assume_yes,
+        "notify_enabled": include_notify,
+        "applied_specs": added_specs,
+        "manual_pending": manual_plugins,
+        "manual_suggestions": sorted(set(manual_suggestions)),
+        "manual_unverified": sorted(set(manual_unverified)),
+    },
+    "plugins": {
+        "expected_ids": expected_ids,
+        "configured_specs": projected_specs if install_mode else current_specs,
+        "auto_installable_specs": sorted(set(auto_install_specs)),
+        "manual_ids": sorted({entry.split(":", 1)[0] for entry in manual_plugins}),
+        "missing_ids": missing_after if install_mode else missing_ids,
+        "optional_skipped_ids": optional_skipped,
+        "blocked_detected_specs": blocked_detected,
+        "recommended_excludes": ["opencode-browser", "opencode-skills"],
+    },
+    "policy": {
+        "blocked_plugin_ids": sorted(blocked),
+        "allow_arbitrary_installs": False,
+    },
+}
+
+generated_json = {
+    "gaeta": {
+        "profile": profile,
+        "plugin_state": lock_payload["plugins"],
+        "direnv_mode": "off",
+        "artifact_root": ".gaeta/artifacts",
+        "phase_control": "docs/.gaeta/*",
+        "status_hint": "Run `gaeta profile sync --dry-run` for preview or `gaeta profile sync --install` to project curated plugin specs.",
+    }
+}
+
+if not dry_run:
+    if install_mode:
+        project_payload["plugin"] = projected_specs
+        project_opencode_path.write_text(json.dumps(project_payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+    lock_path = project / ".gaeta" / "profile.lock.json"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(json.dumps(lock_payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+    opencode_dir = project / ".opencode"
+    opencode_dir.mkdir(parents=True, exist_ok=True)
+    generated_json_path = opencode_dir / "gaeta.generated.json"
+    generated_json_path.write_text(json.dumps(generated_json, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+    generated_md_path = opencode_dir / "gaeta-profile.md"
+    md_lines = [
+        "# Gaeta Profile Context",
+        "",
+        f"- active profile: `{profile}`",
+        f"- direnv mode: `off`",
+        f"- expected plugins: {', '.join(expected_ids) if expected_ids else 'none (minimal policy)'}",
+        f"- configured plugin specs: {', '.join(lock_payload['plugins']['configured_specs']) if lock_payload['plugins']['configured_specs'] else 'none'}",
+        f"- missing expected plugins: {', '.join(lock_payload['plugins']['missing_ids']) if lock_payload['plugins']['missing_ids'] else 'none'}",
+        f"- manual pending plugins: {', '.join(lock_payload['plugins']['manual_ids']) if lock_payload['plugins']['manual_ids'] else 'none'}",
+        f"- blocked detected specs: {', '.join(blocked_detected) if blocked_detected else 'none'}",
+        "",
+        "## Policy",
+        "",
+        "- hard blocked plugins: google-ai-search, telegram-bot, swarm-plugin, agent-of-empires, devcontainers",
+        "- recommended excludes: opencode-browser, opencode-skills",
+        "- sandbox authority remains in gaeta wrapper boundary",
+        "",
+        "## Next command",
+        "",
+        "- run `gaeta doctor --strict .`",
+    ]
+    generated_md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+
+print("gaeta profile sync")
+print(f"  project: {project}")
+print(f"  profile: {profile}")
+print(f"  mode: {'dry-run' if dry_run else ('install' if install_mode else 'sync')}")
+print(f"  current opencode plugin specs: {', '.join(current_specs) if current_specs else 'none'}")
+print(f"  expected plugins: {', '.join(expected_ids) if expected_ids else 'none (minimal)'}")
+print(f"  auto-installable specs: {', '.join(sorted(set(auto_install_specs))) if auto_install_specs else 'none'}")
+print(f"  manual plugins: {', '.join(sorted({entry.split(':', 1)[0] for entry in manual_plugins})) if manual_plugins else 'none'}")
+print(f"  missing expected: {', '.join(lock_payload['plugins']['missing_ids']) if lock_payload['plugins']['missing_ids'] else 'none'}")
+print(f"  blocked detected: {', '.join(blocked_detected) if blocked_detected else 'none'}")
+
+if dry_run:
+    print("  planned writes: opencode.json plugin field, .gaeta/profile.lock.json, .opencode/gaeta.generated.json, .opencode/gaeta-profile.md")
+else:
+    if install_mode:
+        print(f"  wrote: {project_opencode_path.relative_to(project)}")
+    print("  wrote: .gaeta/profile.lock.json")
+    print("  wrote: .opencode/gaeta.generated.json")
+    print("  wrote: .opencode/gaeta-profile.md")
+
+if manual_plugins:
+    print("  manual actions:")
+    for row in manual_plugins:
+        print(f"    - {row}")
+
+if manual_suggestions:
+    print("  suggested install commands:")
+    for row in sorted(set(manual_suggestions)):
+        print(f"    - {row}")
+
+if manual_unverified:
+    print("  unresolved manual installs:")
+    for row in sorted(set(manual_unverified)):
+        print(f"    - {row}")
+
+if install_mode:
+    print("  note: restart OpenCode for plugin changes to load")
+
+if lock_payload["plugins"]["missing_ids"] and not install_mode:
+    print("  next: gaeta profile sync --install")
+elif lock_payload["plugins"]["missing_ids"]:
+    print("  next: resolve manual plugin installs, then rerun: gaeta profile sync")
+else:
+    print("  next: gaeta doctor --strict .")
+PY
+  then
+    error "profile sync failed"
+    return 1
+  fi
+
+  return 0
+}
+
 run_init_command() {
   local target_project="$PWD"
   local force=0
+  local profile_name="$DEFAULT_PROFILE"
+  local install_after_init=1
+  local include_notify=1
   local -a init_positionals=()
 
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'INIT_HELP'
 Usage:
-  gaeta init [--force] [PROJECT_DIR]
+  gaeta init [--force] [--profile minimal|recommended|experimental] [--install|--no-install] [--no-notify] [PROJECT_DIR]
 
 Scaffolds required gaeta workflow files:
   - PROJECT.md
@@ -781,9 +1409,16 @@ Scaffolds required gaeta workflow files:
   - docs/.gaeta/status.md
   - docs/.gaeta/checklist.md
   - docs/.gaeta/backlog.md
+  - .mcp.json.example
+  - .gaeta/profile.json
+  - .gaeta/artifacts/index.html
 
 Options:
-  --force    Overwrite existing files
+  --force                 Overwrite existing files
+  --profile <name>        Profile name (minimal|recommended|experimental)
+  --install               Run profile sync install flow after init (default)
+  --no-install            Skip profile sync install flow after init
+  --no-notify             Skip optional notify plugin projection
 INIT_HELP
     return 0
   fi
@@ -793,12 +1428,38 @@ INIT_HELP
       --force)
         force=1
         ;;
+      --profile)
+        if [[ $# -lt 2 ]]; then
+          error "init --profile requires one value"
+          return 1
+        fi
+        profile_name="$2"
+        shift
+        ;;
+      --profile=*)
+        profile_name="${1#--profile=}"
+        ;;
+      --install)
+        install_after_init=1
+        ;;
+      --no-install)
+        install_after_init=0
+        ;;
+      --no-notify)
+        include_notify=0
+        ;;
       *)
         init_positionals+=("$1")
         ;;
     esac
     shift
   done
+
+  if ! profile_exists "$profile_name"; then
+    error "unsupported profile: ${profile_name}"
+    error "supported profiles: minimal, recommended, experimental"
+    return 1
+  fi
 
   if [[ ${#init_positionals[@]} -gt 1 ]]; then
     error "init accepts at most one optional PROJECT_DIR"
@@ -821,12 +1482,14 @@ INIT_HELP
 
   target_project="$(realpath "$target_project")"
 
-  if ! python3 - "$target_project" "$force" <<'PY'
+  if ! python3 - "$target_project" "$force" "$profile_name" <<'PY'
 import pathlib
+import json
 import sys
 
 project_dir = pathlib.Path(sys.argv[1])
 force = sys.argv[2] == "1"
+profile_name = sys.argv[3]
 
 files = {
     "PROJECT.md": """# PROJECT
@@ -966,12 +1629,13 @@ Define first implementation slice and validation commands.
 
 ## Current Sprint
 
-- [ ] Define initial scope.
-- [ ] Implement first slice.
+- [ ] Confirm gaeta profile target (`minimal`, `recommended`, or `experimental`) and document rationale.
+- [ ] Confirm TUI-first command surface (`gaeta`, `init`, `doctor`, `profile`, `serve`) and compatibility command policy.
+- [ ] Run `gaeta doctor --strict .` and resolve all fails/warnings relevant to safety/profile state.
 
 ## Current
 
-- [ ] Confirm workflow and quality gates.
+- [ ] Validate `/brainstorm`, `/plan`, `/build`, `/review`, `/design`, `/serve`, `/doctor`, `/status`, `/handoff`, `/pause`, `/resume`, `/evolve` command templates.
 
 ## Done
 
@@ -981,6 +1645,37 @@ Define first implementation slice and validation commands.
 
 - [ ] Add deferred work items discovered during implementation.
 """,
+    ".mcp.json.example": """{
+  "servers": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp"
+    }
+  }
+}
+""",
+    ".gaeta/artifacts/index.html": """<!doctype html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <title>Gaeta Artifacts</title>
+</head>
+<body>
+  <h1>Gaeta Artifacts</h1>
+  <p>Generated artifacts and design previews live under <code>.gaeta/artifacts/</code>.</p>
+</body>
+</html>
+""",
+    ".gitignore": """.mcp.json
+.opencode.local.json
+.opencode/local/
+.opencode/sessions/
+.gaeta/server.json
+.gaeta/artifacts/
+.env
+.env*
+""",
 }
 
 actions = {}
@@ -988,29 +1683,442 @@ project_name = project_dir.name
 
 for rel, template in files.items():
     path = project_dir / rel
-    rendered = template.format(project_name=project_name)
+    if "{project_name}" in template:
+        rendered = template.format(project_name=project_name)
+    else:
+        rendered = template
     if path.exists() and not force:
         actions[rel] = "kept"
         continue
     existed_before = path.exists()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(rendered if rendered.endswith("\n") else rendered + "\n", encoding="utf-8")
-    if existed_before:
-        actions[rel] = "overwrote"
-    else:
-        actions[rel] = "created"
+    actions[rel] = "overwrote" if existed_before else "created"
+
+profile_catalog = {
+    "minimal": {
+        "description": "Gaeta-owned safe baseline with no third-party plugin dependencies.",
+        "plugins": [],
+        "direnv": "off",
+    },
+    "recommended": {
+        "description": "Default curated distro profile with vetted plugin integration guidance.",
+        "plugins": [
+            "ocx",
+            "envsitter-guard",
+            "opencode-ignore",
+            "openspec",
+            "plannotator",
+            "micode",
+            "opencode-agents",
+            "notify",
+        ],
+        "direnv": "off",
+    },
+    "experimental": {
+        "description": "High-variance profile extending recommended with browser/skills/memory/session tooling.",
+        "plugins": [
+            "ocx",
+            "envsitter-guard",
+            "opencode-ignore",
+            "openspec",
+            "plannotator",
+            "micode",
+            "opencode-agents",
+            "notify",
+            "opencode-browser",
+            "opencode-skills",
+            "froggy",
+            "opencode-mem",
+            "opencode-roadmap",
+            "opencode-sessions",
+            "opencode-canvas",
+            "opencode-agent-tmux",
+        ],
+        "direnv": "off",
+    },
+}
+
+banned = [
+    "google-ai-search",
+    "telegram-bot",
+    "swarm-plugin",
+    "agent-of-empires",
+    "devcontainers",
+]
+
+profile_payload = {
+    "schema_version": 1,
+    "name": profile_name,
+    "description": profile_catalog[profile_name]["description"],
+    "plugins": profile_catalog[profile_name]["plugins"],
+    "direnv": profile_catalog[profile_name]["direnv"],
+    "banned_plugins": banned,
+}
+
+profile_path = project_dir / ".gaeta" / "profile.json"
+if profile_path.exists() and not force:
+    actions[".gaeta/profile.json"] = "kept"
+else:
+    existed_before = profile_path.exists()
+    profile_path.parent.mkdir(parents=True, exist_ok=True)
+    profile_path.write_text(json.dumps(profile_payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    actions[".gaeta/profile.json"] = "overwrote" if existed_before else "created"
 
 print(f"project: {project_dir}")
+print(f"profile: {profile_name}")
 print("initialized workflow files:")
 for rel in files:
-    action = actions.get(rel, "created")
-    print(f"- {action}: {rel}")
+    print(f"- {actions.get(rel, 'created')}: {rel}")
+print(f"- {actions.get('.gaeta/profile.json', 'created')}: .gaeta/profile.json")
 PY
   then
     error "failed to initialize workflow files"
     return 1
   fi
 
+  info "init complete with profile=${profile_name}"
+
+  if [[ "$install_after_init" -eq 1 ]]; then
+    info "running profile sync install flow"
+    local -a sync_args=(--install)
+    if [[ "$include_notify" -eq 0 ]]; then
+      sync_args+=(--no-notify)
+    fi
+    sync_args+=("$target_project")
+    if ! run_profile_sync_command "${sync_args[@]}"; then
+      error "init completed but profile sync install failed"
+      return 1
+    fi
+    printf 'next:\n'
+    printf '  - gaeta doctor --strict "%s"\n' "$target_project"
+  else
+    printf 'next:\n'
+    printf '  - gaeta profile sync --dry-run "%s"\n' "$target_project"
+    printf '  - gaeta profile sync --install "%s"\n' "$target_project"
+  fi
+  return 0
+}
+
+run_profile_command() {
+  local action="show"
+  local profile_name=""
+  local target_project="$PWD"
+  local -a args=("$@")
+
+  if [[ "${args[0]:-}" == "-h" || "${args[0]:-}" == "--help" ]]; then
+    cat <<'PROFILE_HELP'
+Usage:
+  gaeta profile [PROJECT_DIR]
+  gaeta profile list
+  gaeta profile set <minimal|recommended|experimental> [PROJECT_DIR]
+  gaeta profile sync [--dry-run] [--install] [--profile <name>] [--yes] [PROJECT_DIR]
+PROFILE_HELP
+    return 0
+  fi
+
+  if [[ "${args[0]:-}" == "list" ]]; then
+    print_profile_catalog
+    return 0
+  fi
+
+  if [[ "${args[0]:-}" == "sync" ]]; then
+    args=("${args[@]:1}")
+    run_profile_sync_command "${args[@]}"
+    return $?
+  fi
+
+  if [[ "${args[0]:-}" == "set" ]]; then
+    if [[ ${#args[@]} -lt 2 ]]; then
+      error "profile set requires a profile name"
+      return 1
+    fi
+    profile_name="${args[1]}"
+    if ! profile_exists "$profile_name"; then
+      error "unsupported profile: ${profile_name}"
+      return 1
+    fi
+    if [[ ${#args[@]} -ge 3 ]]; then
+      target_project="${args[2]}"
+    fi
+    action="set"
+  elif [[ ${#args[@]} -ge 1 ]]; then
+    target_project="${args[0]}"
+  fi
+
+  if [[ ! -d "$target_project" ]]; then
+    error "profile project directory does not exist: ${target_project}"
+    return 1
+  fi
+  target_project="$(realpath "$target_project")"
+
+  if [[ "$action" == "set" ]]; then
+    if ! write_profile_metadata "$target_project" "$profile_name"; then
+      return 1
+    fi
+    printf 'gaeta profile\n'
+    printf '  project: %s\n' "$target_project"
+    printf '  active: %s\n' "$profile_name"
+    return 0
+  fi
+
+  profile_name="$(detect_profile_name "$target_project")"
+  printf 'gaeta profile\n'
+  printf '  project: %s\n' "$target_project"
+  printf '  active: %s\n' "$profile_name"
+  printf '  profiles:\n'
+  while IFS= read -r row; do
+    printf '    - %s\n' "$row"
+  done < <(print_profile_catalog)
+  return 0
+}
+
+run_serve_command() {
+  local action="start"
+  local target_project="$PWD"
+  local host="127.0.0.1"
+  local port=""
+  local allow_listing=0
+  local root_override=""
+  local -a args=("$@")
+
+  if [[ "${args[0]:-}" == "-h" || "${args[0]:-}" == "--help" ]]; then
+    cat <<'SERVE_HELP'
+Usage:
+  gaeta serve [PROJECT_DIR]
+  gaeta serve status [PROJECT_DIR]
+  gaeta serve stop [PROJECT_DIR]
+
+Options:
+  --host <addr>         bind host (default: 127.0.0.1)
+  --port <num>          bind port (default: free local port)
+  --root <path>         override artifact root (default: .gaeta/artifacts)
+  --allow-listing       allow directory listing when no index exists
+SERVE_HELP
+    return 0
+  fi
+
+  if [[ "${args[0]:-}" == "status" || "${args[0]:-}" == "stop" ]]; then
+    action="${args[0]}"
+    args=("${args[@]:1}")
+  fi
+
+  while [[ ${#args[@]} -gt 0 ]]; do
+    case "${args[0]}" in
+      --host)
+        host="${args[1]:-}"
+        args=("${args[@]:2}")
+        ;;
+      --host=*)
+        host="${args[0]#--host=}"
+        args=("${args[@]:1}")
+        ;;
+      --port)
+        port="${args[1]:-}"
+        args=("${args[@]:2}")
+        ;;
+      --port=*)
+        port="${args[0]#--port=}"
+        args=("${args[@]:1}")
+        ;;
+      --root)
+        root_override="${args[1]:-}"
+        args=("${args[@]:2}")
+        ;;
+      --root=*)
+        root_override="${args[0]#--root=}"
+        args=("${args[@]:1}")
+        ;;
+      --allow-listing)
+        allow_listing=1
+        args=("${args[@]:1}")
+        ;;
+      *)
+        target_project="${args[0]}"
+        args=("${args[@]:1}")
+        ;;
+    esac
+  done
+
+  if [[ ! -d "$target_project" ]]; then
+    error "serve project directory does not exist: ${target_project}"
+    return 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    error "python3 is required for serve command"
+    return 1
+  fi
+
+  target_project="$(realpath "$target_project")"
+  local meta_file="${target_project}/.gaeta/server.json"
+  local artifact_root="${target_project}/.gaeta/artifacts"
+  if [[ -n "$root_override" ]]; then
+    artifact_root="$root_override"
+  fi
+
+  if [[ "$action" == "status" ]]; then
+    python3 - "$meta_file" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+if not path.exists():
+    print("gaeta serve")
+    print("  status: stopped")
+    raise SystemExit(0)
+
+payload = json.loads(path.read_text(encoding="utf-8"))
+pid = int(payload.get("pid", 0) or 0)
+alive = False
+if pid > 0:
+    try:
+        os.kill(pid, 0)
+        alive = True
+    except OSError:
+        alive = False
+
+print("gaeta serve")
+print(f"  status: {'running' if alive else 'stale'}")
+for key in ["host", "port", "root", "url", "pid", "started_at"]:
+    if key in payload:
+        print(f"  {key}: {payload[key]}")
+PY
+    return 0
+  fi
+
+  if [[ "$action" == "stop" ]]; then
+    python3 - "$meta_file" <<'PY'
+import json
+import os
+import pathlib
+import signal
+import sys
+
+path = pathlib.Path(sys.argv[1])
+if not path.exists():
+    print("gaeta serve")
+    print("  status: already stopped")
+    raise SystemExit(0)
+
+payload = json.loads(path.read_text(encoding="utf-8"))
+pid = int(payload.get("pid", 0) or 0)
+stopped = False
+if pid > 0:
+    try:
+        os.kill(pid, signal.SIGTERM)
+        stopped = True
+    except OSError:
+        stopped = False
+
+path.unlink(missing_ok=True)
+print("gaeta serve")
+print(f"  status: {'stopped' if stopped else 'stopped (stale pid)'}")
+PY
+    return 0
+  fi
+
+  local root_real
+  root_real="$(python3 - "$artifact_root" "$target_project" <<'PY'
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1]).expanduser().resolve()
+project = pathlib.Path(sys.argv[2]).resolve()
+print(root)
+if root == project:
+    raise SystemExit(2)
+PY
+)" || {
+    error "artifact root must not be repository root"
+    return 1
+  }
+
+  mkdir -p "$root_real"
+  if [[ "$allow_listing" -eq 0 && ! -f "$root_real/index.html" ]]; then
+    cat >"$root_real/index.html" <<'EOF'
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gaeta Artifacts</title>
+</head>
+<body>
+  <h1>Gaeta Artifacts</h1>
+  <p>No index was present; gaeta created this file to avoid raw directory listing.</p>
+</body>
+</html>
+EOF
+  fi
+
+  if [[ -z "$port" ]]; then
+    port="$(python3 - <<'PY'
+import socket
+sock = socket.socket()
+sock.bind(("127.0.0.1", 0))
+print(sock.getsockname()[1])
+sock.close()
+PY
+)"
+  fi
+
+  if [[ "$host" == "0.0.0.0" ]]; then
+    warning "serving on 0.0.0.0 exposes LAN access"
+  fi
+
+  mkdir -p "${target_project}/.gaeta"
+  local log_file="${target_project}/.gaeta/server.log"
+  python3 -m http.server "$port" --bind "$host" --directory "$root_real" >"$log_file" 2>&1 &
+  local pid=$!
+
+  python3 - "$meta_file" "$host" "$port" "$root_real" "$pid" <<'PY'
+import datetime
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+host = sys.argv[2]
+port = int(sys.argv[3])
+root = sys.argv[4]
+pid = int(sys.argv[5])
+
+payload = {
+    "schema_version": 1,
+    "host": host,
+    "port": port,
+    "root": root,
+    "pid": pid,
+    "url": f"http://{host}:{port}/",
+    "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+}
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+PY
+
+  printf 'gaeta serve\n'
+  printf '  status: running\n'
+  printf '  host: %s\n' "$host"
+  printf '  port: %s\n' "$port"
+  printf '  root: %s\n' "$root_real"
+  printf '  metadata: %s\n' "$meta_file"
+  printf '  url: http://%s:%s/\n' "$host" "$port"
+  return 0
+}
+
+run_upgrade_command() {
+  local target_project="${1:-$PWD}"
+  if [[ ! -d "$target_project" ]]; then
+    error "upgrade project directory does not exist: ${target_project}"
+    return 1
+  fi
+  target_project="$(realpath "$target_project")"
+  printf 'gaeta upgrade\n'
+  printf '  project: %s\n' "$target_project"
+  printf '  status: not implemented yet\n'
+  printf "  note: use gaeta init --profile <name> --force %s after backing up local files.\n" "$target_project"
   return 0
 }
 
@@ -1648,6 +2756,9 @@ STATUS_HELP
   if ! python3 - "$target_project" "$status_file" "$checklist_file" <<'PY'
 import pathlib
 import re
+import json
+import os
+import shutil
 import sys
 
 
@@ -1685,6 +2796,11 @@ def normalize_bullets(text: str, fallback: str) -> list[str]:
 project = pathlib.Path(sys.argv[1])
 status_path = pathlib.Path(sys.argv[2])
 checklist_path = pathlib.Path(sys.argv[3])
+profile_path = project / ".gaeta" / "profile.json"
+lock_path = project / ".gaeta" / "profile.lock.json"
+server_path = project / ".gaeta" / "server.json"
+pause_path = project / "docs" / ".gaeta" / "pause.md"
+generated_profile = project / ".opencode" / "gaeta-profile.md"
 
 status_text = status_path.read_text(encoding="utf-8")
 checklist_text = checklist_path.read_text(encoding="utf-8")
@@ -1707,6 +2823,79 @@ print("gaeta status")
 print(f"  project: {project}")
 print(f"  phase: {phase_value}")
 print(f"  next step: {next_step_value}")
+
+profile_name = "recommended"
+direnv_mode = "off"
+if profile_path.exists():
+    try:
+        profile_payload = json.loads(profile_path.read_text(encoding="utf-8"))
+        if isinstance(profile_payload, dict):
+            raw = profile_payload.get("name")
+            if isinstance(raw, str) and raw.strip():
+                profile_name = raw.strip()
+            raw_direnv = profile_payload.get("direnv")
+            if isinstance(raw_direnv, str) and raw_direnv.strip():
+                direnv_mode = raw_direnv.strip()
+    except Exception:
+        pass
+
+print(f"  gaeta profile: {profile_name}")
+print(f"  direnv mode: {direnv_mode}")
+print(f"  sandbox status: {'bwrap available' if shutil.which('bwrap') else 'bwrap missing'}")
+
+if server_path.exists():
+    try:
+        server_payload = json.loads(server_path.read_text(encoding="utf-8"))
+    except Exception:
+        server_payload = {}
+    pid = int(server_payload.get("pid", 0) or 0)
+    alive = False
+    if pid > 0:
+        try:
+            os.kill(pid, 0)
+            alive = True
+        except OSError:
+            alive = False
+    print(f"  artifact server: {'running' if alive else 'stale'}")
+    if isinstance(server_payload.get("url"), str):
+        print(f"  artifact url: {server_payload['url']}")
+else:
+    print("  artifact server: stopped")
+    print("  artifact url: (not running)")
+
+if shutil.which("sem"):
+    sem_fresh = "unknown"
+    if lock_path.exists():
+        sem_fresh = "from last profile sync snapshot"
+    print(f"  sem status: available ({sem_fresh})")
+else:
+    print("  sem status: unavailable")
+
+if lock_path.exists():
+    try:
+        lock_payload = json.loads(lock_path.read_text(encoding="utf-8"))
+    except Exception:
+        lock_payload = {}
+    plugins = lock_payload.get("plugins", {}) if isinstance(lock_payload, dict) else {}
+    expected = plugins.get("expected_ids", []) if isinstance(plugins, dict) else []
+    configured = plugins.get("configured_specs", []) if isinstance(plugins, dict) else []
+    missing = plugins.get("missing_ids", []) if isinstance(plugins, dict) else []
+    print(f"  expected profile plugins: {', '.join(expected) if expected else 'none (minimal)'}")
+    print(f"  configured plugins: {', '.join(configured) if configured else 'none detected'}")
+    print(f"  missing profile plugins: {', '.join(missing) if missing else 'none'}")
+else:
+    print("  expected profile plugins: unknown (run gaeta profile sync)")
+    print("  configured plugins: unknown (run gaeta profile sync)")
+    print("  missing profile plugins: unknown (run gaeta profile sync)")
+
+print(f"  last handoff/status file: {pause_path if pause_path.exists() else status_path}")
+if not lock_path.exists():
+    print("  next suggested command: gaeta profile sync --dry-run .")
+elif generated_profile.exists():
+    print("  next suggested command: gaeta doctor --strict .")
+else:
+    print("  next suggested command: gaeta profile sync .")
+
 print("  top pending sprint items:")
 if pending_sprint:
     for item in pending_sprint[:5]:
@@ -2367,6 +3556,24 @@ determine_tty_session_mode() {
   return 0
 }
 
+run_fast_safety_checks() {
+  local target_project="$1"
+  local profile_name
+  profile_name="$(detect_profile_name "$target_project")"
+  info "Active profile: ${profile_name}"
+
+  local mcp_example="${target_project}/.mcp.json.example"
+  if [[ ! -f "$mcp_example" ]]; then
+    warning "missing .mcp.json.example (run: gaeta init --profile ${profile_name} ${target_project})"
+  fi
+
+  if command -v git >/dev/null 2>&1; then
+    if git -C "$target_project" ls-files --error-unmatch .mcp.json >/dev/null 2>&1; then
+      warning ".mcp.json is tracked by git; remove it from index and rotate any exposed credentials"
+    fi
+  fi
+}
+
 print_doctor_check() {
   local label="$1"
   local state="$2"
@@ -2438,6 +3645,7 @@ section_key_map = {
     "Projection Artifacts": "projection_artifacts",
     "Sandbox Check": "sandbox_check",
     "Workflow Files": "workflow_files",
+    "Safety Checks": "safety_checks",
 }
 
 checks = {value: [] for value in section_key_map.values()}
@@ -2486,12 +3694,13 @@ run_doctor_command() {
   local target_project="$PWD"
   local doctor_json_flag=0
   local doctor_verbose_flag=0
+  local doctor_strict_flag=1
   local -a doctor_positionals=()
 
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'DOCTOR_HELP'
 Usage:
-  gaeta doctor [--json] [--verbose] [PROJECT_DIR]
+  gaeta doctor [--json] [--verbose] [--strict|--no-strict] [PROJECT_DIR]
 
 Runs gaeta self-inspection checks for dependencies, config source selection,
 projection artifacts, and workflow files.
@@ -2499,6 +3708,8 @@ projection artifacts, and workflow files.
 Options:
   --json      Emit machine-readable JSON output
   --verbose   Emit full human-readable check table
+  --strict    Exit non-zero on warnings or failures (default)
+  --no-strict Exit non-zero only on failures
 DOCTOR_HELP
     return 0
   fi
@@ -2510,6 +3721,12 @@ DOCTOR_HELP
         ;;
       --verbose)
         doctor_verbose_flag=1
+        ;;
+      --strict)
+        doctor_strict_flag=1
+        ;;
+      --no-strict)
+        doctor_strict_flag=0
         ;;
       *)
         doctor_positionals+=("$1")
@@ -2546,6 +3763,7 @@ DOCTOR_HELP
 
   DOCTOR_JSON=${doctor_json_flag}
   DOCTOR_VERBOSE=${doctor_verbose_flag}
+  DOCTOR_STRICT=${doctor_strict_flag}
   DOCTOR_COLLECT=1
   CURRENT_DOCTOR_SECTION=""
   local -a DOCTOR_CHECK_ROWS=()
@@ -2957,6 +4175,436 @@ PY
     ((warn_count += 1))
   fi
 
+  if [[ "$DOCTOR_JSON" -ne 1 && "$DOCTOR_VERBOSE" -eq 1 ]]; then
+    printf '\n'
+    printf 'Safety Checks\n'
+  fi
+  CURRENT_DOCTOR_SECTION="Safety Checks"
+
+  local profile_file="${target_project}/.gaeta/profile.json"
+  local active_profile
+  active_profile="$(detect_profile_name "$target_project")"
+  if profile_exists "$active_profile"; then
+    print_doctor_check "active profile" "ok" "${active_profile}"
+  else
+    print_doctor_check "active profile" "warn" "undetected; defaulting to ${DEFAULT_PROFILE}"
+    ((warn_count += 1))
+  fi
+
+  if [[ -f "$profile_file" ]]; then
+    print_doctor_check "profile metadata" "ok" "$profile_file"
+  else
+    print_doctor_check "profile metadata" "warn" "missing ${profile_file} (run: gaeta init --profile ${DEFAULT_PROFILE} \"${target_project}\")"
+    ((warn_count += 1))
+  fi
+
+  local profile_lock_file="${target_project}/.gaeta/profile.lock.json"
+  local profile_generated_json="${target_project}/.opencode/gaeta.generated.json"
+  local profile_generated_md="${target_project}/.opencode/gaeta-profile.md"
+  if [[ -f "$profile_lock_file" ]]; then
+    print_doctor_check "profile lockfile" "ok" "$profile_lock_file"
+  else
+    print_doctor_check "profile lockfile" "warn" "missing ${profile_lock_file} (run: gaeta profile sync .)"
+    ((warn_count += 1))
+  fi
+
+  if [[ -f "$profile_generated_json" && -f "$profile_generated_md" ]]; then
+    print_doctor_check "profile context projection" "ok" ".opencode/gaeta.generated.json and .opencode/gaeta-profile.md"
+  else
+    print_doctor_check "profile context projection" "warn" "missing generated profile context (run: gaeta profile sync .)"
+    ((warn_count += 1))
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    local freshness_result
+    if freshness_result=$(python3 - "$profile_file" "$profile_lock_file" "$profile_generated_json" "$profile_generated_md" <<'PY'
+import pathlib
+import sys
+
+profile = pathlib.Path(sys.argv[1])
+lock = pathlib.Path(sys.argv[2])
+generated_json = pathlib.Path(sys.argv[3])
+generated_md = pathlib.Path(sys.argv[4])
+
+if not profile.exists():
+    print("warn\tprofile metadata missing")
+    raise SystemExit(0)
+
+targets = [lock, generated_json, generated_md]
+missing = [str(path) for path in targets if not path.exists()]
+if missing:
+    print("warn\tmissing generated state: " + ", ".join(missing))
+    raise SystemExit(0)
+
+profile_mtime = profile.stat().st_mtime
+stale = [str(path) for path in targets if path.stat().st_mtime < profile_mtime]
+if stale:
+    print("warn\tstale generated state: " + ", ".join(stale))
+else:
+    print("ok\tprofile lock/context fresh")
+PY
+); then
+      local freshness_state="${freshness_result%%$'\t'*}"
+      local freshness_details="${freshness_result#*$'\t'}"
+      if [[ "$freshness_state" == "warn" ]]; then
+        ((warn_count += 1))
+      fi
+      print_doctor_check "profile sync freshness" "$freshness_state" "$freshness_details"
+    fi
+  fi
+
+  if [[ -f "$profile_lock_file" ]] && command -v python3 >/dev/null 2>&1; then
+    local plugin_sync_result
+    if plugin_sync_result=$(python3 - "$profile_lock_file" "$active_profile" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+active_profile = sys.argv[2]
+payload = json.loads(path.read_text(encoding="utf-8"))
+plugins = payload.get("plugins", {}) if isinstance(payload, dict) else {}
+install = payload.get("install", {}) if isinstance(payload, dict) else {}
+
+missing = plugins.get("missing_ids", []) if isinstance(plugins, dict) else []
+blocked = plugins.get("blocked_detected_specs", []) if isinstance(plugins, dict) else []
+manual_suggestions = install.get("manual_suggestions", []) if isinstance(install, dict) else []
+manual_unverified = install.get("manual_unverified", []) if isinstance(install, dict) else []
+
+if blocked:
+    print("fail\tblocked plugins detected in current runtime: " + ", ".join(blocked))
+elif missing:
+    suggestion_suffix = ""
+    if manual_suggestions:
+        suggestion_suffix = " | suggested installs: " + "; ".join(manual_suggestions[:5])
+    if manual_unverified:
+        unresolved_suffix = " | unresolved: " + "; ".join(manual_unverified[:5])
+        suggestion_suffix = suggestion_suffix + unresolved_suffix
+    if active_profile == "recommended":
+        print("warn\trecommended profile is not fully projected: " + ", ".join(missing) + " (run: gaeta profile sync --dry-run . ; gaeta profile sync --install .)" + suggestion_suffix)
+    else:
+        print("warn\tmissing curated plugins: " + ", ".join(missing) + suggestion_suffix)
+else:
+    print("ok\tprofile plugin sync is aligned")
+PY
+); then
+      local plugin_sync_state="${plugin_sync_result%%$'\t'*}"
+      local plugin_sync_details="${plugin_sync_result#*$'\t'}"
+      case "$plugin_sync_state" in
+        warn) ((warn_count += 1)) ;;
+        fail) ((fail_count += 1)) ;;
+      esac
+      print_doctor_check "profile plugin sync" "$plugin_sync_state" "$plugin_sync_details"
+    fi
+  fi
+
+  local mcp_example="${target_project}/.mcp.json.example"
+  if [[ -f "$mcp_example" ]]; then
+    print_doctor_check "mcp example" "ok" "$mcp_example"
+  else
+    print_doctor_check "mcp example" "fail" "missing .mcp.json.example"
+    ((fail_count += 1))
+  fi
+
+  if command -v git >/dev/null 2>&1; then
+    if git -C "$target_project" ls-files --error-unmatch .mcp.json >/dev/null 2>&1; then
+      print_doctor_check "tracked mcp" "fail" ".mcp.json is tracked by git; untrack and rotate credentials"
+      ((fail_count += 1))
+    else
+      print_doctor_check "tracked mcp" "ok" ".mcp.json not tracked"
+    fi
+  else
+    print_doctor_check "tracked mcp" "warn" "git unavailable; unable to verify tracked .mcp.json"
+    ((warn_count += 1))
+  fi
+
+  local ignore_check="warn"
+  local ignore_details=""
+  if command -v python3 >/dev/null 2>&1; then
+    local ignore_result
+    if ignore_result=$(python3 - "$target_project" <<'PY'
+import pathlib
+import sys
+
+project = pathlib.Path(sys.argv[1])
+paths = [project / ".gitignore", project / "gitignore"]
+existing = [path for path in paths if path.exists()]
+if not existing:
+    print("warn\t.gitignore missing")
+    raise SystemExit(0)
+
+lines = []
+for path in existing:
+    lines.extend(
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    )
+required = [
+    ".mcp.json",
+    ".opencode.local.json",
+    ".opencode/local/",
+    ".opencode/sessions/",
+    ".gaeta/server.json",
+    ".gaeta/artifacts/",
+    ".env",
+    ".env*",
+]
+missing = [item for item in required if item not in lines]
+if missing:
+    print("warn\tmissing ignore entries: " + ", ".join(missing))
+else:
+    print("ok\trequired ignore entries present")
+PY
+); then
+      ignore_check="${ignore_result%%$'\t'*}"
+      ignore_details="${ignore_result#*$'\t'}"
+    else
+      ignore_check="warn"
+      ignore_details="failed to validate .gitignore entries"
+    fi
+  else
+    ignore_check="warn"
+    ignore_details="python3 unavailable; unable to validate .gitignore entries"
+  fi
+  if [[ "$ignore_check" == "warn" ]]; then
+    ((warn_count += 1))
+  fi
+  print_doctor_check "ignore policy" "$ignore_check" "$ignore_details"
+
+  local secret_check="ok"
+  local secret_details="no obvious committed token patterns detected"
+  if command -v python3 >/dev/null 2>&1 && command -v git >/dev/null 2>&1; then
+    local secret_result
+    if secret_result=$(python3 - "$target_project" <<'PY'
+import pathlib
+import re
+import subprocess
+import sys
+
+project = pathlib.Path(sys.argv[1])
+patterns = [
+    re.compile(r"(?i)bearer\s+[A-Za-z0-9_\-\.]{16,}"),
+    re.compile(r"\bsk-[A-Za-z0-9]{16,}\b"),
+    re.compile(r"\b(?:api[_-]?key|token|secret)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{16,}"),
+]
+
+try:
+    subprocess.check_call(
+        ["git", "-C", str(project), "rev-parse", "--is-inside-work-tree"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+except Exception:
+    print("ok\tsecret scan skipped (project is not a git repository)")
+    raise SystemExit(0)
+
+try:
+    files = subprocess.check_output(["git", "-C", str(project), "ls-files"], text=True).splitlines()
+except Exception:
+    print("warn\tunable to enumerate tracked files")
+    raise SystemExit(0)
+
+suspects = []
+for rel in files:
+    p = project / rel
+    if not p.is_file():
+        continue
+    if not any(part in rel for part in ["opencode", "gaeta", ".mcp", ".env"]):
+        continue
+    if p.stat().st_size > 200_000:
+        continue
+    try:
+        text = p.read_text(encoding="utf-8")
+    except Exception:
+        continue
+    for pattern in patterns:
+        if pattern.search(text):
+            suspects.append(rel)
+            break
+
+if suspects:
+    print("warn\tpossible secret patterns in tracked files: " + ", ".join(sorted(set(suspects))))
+else:
+    print("ok\tno obvious committed token patterns detected")
+PY
+); then
+      secret_check="${secret_result%%$'\t'*}"
+      secret_details="${secret_result#*$'\t'}"
+    else
+      secret_check="warn"
+      secret_details="failed to scan tracked files for secret patterns"
+    fi
+  else
+    secret_check="warn"
+    secret_details="python3/git unavailable; unable to scan tracked files"
+  fi
+  if [[ "$secret_check" == "warn" ]]; then
+    ((warn_count += 1))
+  fi
+  print_doctor_check "secret scan" "$secret_check" "$secret_details"
+
+  local profile_consistency_state="ok"
+  local profile_consistency_details="profile plugin policy is internally consistent"
+  if command -v python3 >/dev/null 2>&1; then
+    local profile_consistency
+    if profile_consistency=$(python3 - "$profile_file" "$active_profile" <<'PY'
+import json
+import pathlib
+import sys
+
+profile_path = pathlib.Path(sys.argv[1])
+active = sys.argv[2]
+if not profile_path.exists():
+    print("warn\tprofile metadata missing")
+    raise SystemExit(0)
+
+payload = json.loads(profile_path.read_text(encoding="utf-8"))
+plugins = payload.get("plugins", []) if isinstance(payload, dict) else []
+if not isinstance(plugins, list):
+    print("warn\tplugins must be a list")
+    raise SystemExit(0)
+
+banned = {"google-ai-search", "telegram-bot", "swarm-plugin", "agent-of-empires", "devcontainers"}
+present_banned = sorted(set(plugins) & banned)
+if present_banned:
+    print("fail\tbanned plugins present: " + ", ".join(present_banned))
+    raise SystemExit(0)
+
+if active == "minimal" and plugins:
+    print("fail\tminimal profile must not include third-party plugins")
+    raise SystemExit(0)
+
+if active == "recommended":
+    required = {"ocx", "envsitter-guard", "opencode-ignore", "openspec", "plannotator", "micode", "opencode-agents"}
+    missing = sorted(required.difference(set(plugins)))
+    forbidden = sorted({"opencode-browser", "opencode-skills"}.intersection(set(plugins)))
+    if missing:
+        print("warn\trecommended profile missing curated entries: " + ", ".join(missing))
+        raise SystemExit(0)
+    if forbidden:
+        print("fail\trecommended profile must not include: " + ", ".join(forbidden))
+        raise SystemExit(0)
+
+if active == "experimental":
+    required = {"opencode-browser", "opencode-skills"}
+    missing = sorted(required.difference(set(plugins)))
+    if missing:
+        print("warn\texperimental profile missing entries: " + ", ".join(missing))
+        raise SystemExit(0)
+
+direnv = payload.get("direnv", "off")
+print("ok\tplugin policy and profile entries are consistent (direnv=" + str(direnv) + ")")
+PY
+); then
+      profile_consistency_state="${profile_consistency%%$'\t'*}"
+      profile_consistency_details="${profile_consistency#*$'\t'}"
+    else
+      profile_consistency_state="warn"
+      profile_consistency_details="failed to validate profile consistency"
+    fi
+  else
+    profile_consistency_state="warn"
+    profile_consistency_details="python3 unavailable; unable to validate profile consistency"
+  fi
+  case "$profile_consistency_state" in
+    warn) ((warn_count += 1)) ;;
+    fail) ((fail_count += 1)) ;;
+  esac
+  print_doctor_check "profile consistency" "$profile_consistency_state" "$profile_consistency_details"
+
+  local direnv_state="ok"
+  local direnv_details="direnv disabled"
+  if [[ -f "$profile_file" ]] && command -v python3 >/dev/null 2>&1; then
+    local direnv_mode
+    direnv_mode=$(python3 - "$profile_file" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+mode = payload.get("direnv", "off")
+print(mode if isinstance(mode, str) else "off")
+PY
+)
+    if [[ "$direnv_mode" == "allow" && "${GAETA_ALLOW_DIRENV:-0}" != "1" ]]; then
+      direnv_state="warn"
+      direnv_details="direnv allowed in profile but GAETA_ALLOW_DIRENV=1 is not set"
+    elif [[ "$direnv_mode" == "allow" && "${GAETA_ALLOW_DIRENV:-0}" == "1" ]]; then
+      direnv_state="ok"
+      direnv_details="direnv explicitly allowed via GAETA_ALLOW_DIRENV=1"
+    fi
+  fi
+  if [[ "$direnv_state" == "warn" ]]; then
+    ((warn_count += 1))
+  fi
+  print_doctor_check "direnv gate" "$direnv_state" "$direnv_details"
+
+  local artifact_state="ok"
+  local artifact_details="artifact root is project-local"
+  local artifact_root="${target_project}/.gaeta/artifacts"
+  local artifact_secret_state="ok"
+  local artifact_secret_details="no obvious secret-like artifact filenames"
+  if command -v python3 >/dev/null 2>&1; then
+    local artifact_result
+    artifact_result=$(python3 - "$target_project" "$artifact_root" <<'PY'
+import pathlib
+import sys
+
+project = pathlib.Path(sys.argv[1]).resolve()
+root = pathlib.Path(sys.argv[2]).resolve()
+if root == project:
+    print("fail\tartifact root resolves to repository root")
+elif str(root).startswith(str(project)):
+    print("ok\tartifact root is project-local")
+else:
+    print("warn\tartifact root is outside project: " + str(root))
+PY
+)
+    artifact_state="${artifact_result%%$'\t'*}"
+    artifact_details="${artifact_result#*$'\t'}"
+
+    local artifact_secret
+    artifact_secret=$(python3 - "$artifact_root" <<'PY'
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+if not root.exists():
+    print("ok\tartifact root not present yet")
+    raise SystemExit(0)
+
+suspect_names = {".env", "id_rsa", "credentials.json", "secrets.txt"}
+suspect_suffixes = {".pem", ".key"}
+hits = []
+for path in root.rglob("*"):
+    if not path.is_file():
+        continue
+    name = path.name.lower()
+    if name in suspect_names or any(name.endswith(s) for s in suspect_suffixes):
+        hits.append(str(path.relative_to(root)))
+
+if hits:
+    print("warn\tartifact root contains secret-like files: " + ", ".join(sorted(hits)[:5]))
+else:
+    print("ok\tno obvious secret-like artifact filenames")
+PY
+)
+    artifact_secret_state="${artifact_secret%%$'\t'*}"
+    artifact_secret_details="${artifact_secret#*$'\t'}"
+  fi
+
+  case "$artifact_state" in
+    warn) ((warn_count += 1)) ;;
+    fail) ((fail_count += 1)) ;;
+  esac
+  print_doctor_check "artifact root" "$artifact_state" "$artifact_details"
+  if [[ "$artifact_secret_state" == "warn" ]]; then
+    ((warn_count += 1))
+  fi
+  print_doctor_check "artifact secret scan" "$artifact_secret_state" "$artifact_secret_details"
+
   if [[ "$DOCTOR_JSON" -eq 1 ]]; then
     if ! render_doctor_json "$target_project" "$fail_count" "$warn_count" "$generated_at"; then
       return 1
@@ -2982,6 +4630,9 @@ PY
   fi
 
   if [[ "$fail_count" -gt 0 ]]; then
+    return 1
+  fi
+  if [[ "${DOCTOR_STRICT:-0}" -eq 1 && "$warn_count" -gt 0 ]]; then
     return 1
   fi
   return 0
@@ -3729,6 +5380,33 @@ if [[ "${1:-}" == "doctor" ]]; then
   exit 0
 fi
 
+# Command dispatch: gaeta profile ...
+if [[ "${1:-}" == "profile" ]]; then
+  shift
+  if ! run_profile_command "$@"; then
+    exit 1
+  fi
+  exit 0
+fi
+
+# Command dispatch: gaeta serve ...
+if [[ "${1:-}" == "serve" ]]; then
+  shift
+  if ! run_serve_command "$@"; then
+    exit 1
+  fi
+  exit 0
+fi
+
+# Command dispatch: gaeta upgrade ...
+if [[ "${1:-}" == "upgrade" ]]; then
+  shift
+  if ! run_upgrade_command "$@"; then
+    exit 1
+  fi
+  exit 0
+fi
+
 # Command dispatch: gaeta status ...
 if [[ "${1:-}" == "status" ]]; then
   shift
@@ -3980,6 +5658,8 @@ SANDBOX_WORKDIR="$PROJECT_DIR"
 if ! require_project_initialized "$PROJECT_DIR" "launch"; then
   exit 1
 fi
+
+run_fast_safety_checks "$PROJECT_DIR"
 
 init_metadata_dir
 update_phase "validated"
@@ -4305,6 +5985,7 @@ BWRAP_CMD+=(
   --setenv HOME /home/gaeta
   --setenv USER gaeta
   --setenv LOGNAME gaeta
+  --setenv GAETA_PROFILE "$(detect_profile_name "$PROJECT_DIR")"
   --setenv MISE_SKIP_ACTIVATE 1
   --setenv UV_LINK_MODE copy
 )

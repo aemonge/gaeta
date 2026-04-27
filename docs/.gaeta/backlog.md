@@ -24,3 +24,6 @@
 - [ ] Validate a low-risk non-Perplexity search MCP candidate and document advisory-use boundaries.
 - [ ] Evaluate Semgrep MCP integration using pinned/self-hosted setup guidance before enabling by default.
 - [ ] Add project-level persistence guidance (or command support) for operator allow/reject permission choices so interactive approvals are not lost across sessions/projects.
+- [ ] Implement `gaeta upgrade` template re-projection with backup/diff-safe overwrite flow.
+- [ ] Add safe, deterministic OCX-backed plugin installation execution for `gaeta profile sync --install` once plugin installer command contracts are verified and pinned.
+- [ ] Promote currently-manual curated plugins to verified `opencode-plugin` specs as maintainers publish authoritative package names (envsitter-guard, opencode-ignore, froggy, roadmap, sessions, canvas, agent-tmux, skills).

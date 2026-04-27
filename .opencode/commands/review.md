@@ -16,6 +16,8 @@ Run these checks in order:
 3. `git diff --staged`
 4. If `sem` is available, run `sem`; otherwise skip with a short note.
 
+When `sem` is available, include changed-symbol observations (or state explicitly if no symbol-level signal is available).
+
 Then reply with a concise review bundle:
 - changed files,
 - highest-risk diffs,

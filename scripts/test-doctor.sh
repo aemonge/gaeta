@@ -22,7 +22,7 @@ cp -R "${FIXTURE_ROOT}/project/." "${TEST_PROJECT}/"
 
 DOCTOR_JSON_PATH="${TEST_ROOT}/doctor.json"
 
-HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat "$GAETA_BIN" doctor --json "$TEST_PROJECT" >"$DOCTOR_JSON_PATH"
+HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat "$GAETA_BIN" doctor --no-strict --json "$TEST_PROJECT" >"$DOCTOR_JSON_PATH"
 
 python3 - "$DOCTOR_JSON_PATH" "$TEST_PROJECT" <<'PY'
 import json
@@ -35,7 +35,7 @@ project = pathlib.Path(sys.argv[2])
 payload = json.loads(doctor_path.read_text(encoding="utf-8"))
 
 assert payload["summary"]["fail"] == 0, payload
-assert payload["status"] == "ok", payload
+assert payload["status"] in {"ok", "warn"}, payload
 
 checks = payload["checks"]
 for key in [
@@ -45,6 +45,7 @@ for key in [
     "projection_artifacts",
     "sandbox_check",
     "workflow_files",
+    "safety_checks",
 ]:
     assert len(checks[key]) > 0, (key, payload)
 
@@ -104,7 +105,7 @@ path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
 
 DISABLED_DOCTOR_JSON_PATH="${TEST_ROOT}/doctor-monitor-warn.json"
-HOME="$DISABLED_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat "$GAETA_BIN" doctor --json "$TEST_PROJECT" >"$DISABLED_DOCTOR_JSON_PATH"
+HOME="$DISABLED_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 GAETA_TTY_MODE=compat "$GAETA_BIN" doctor --no-strict --json "$TEST_PROJECT" >"$DISABLED_DOCTOR_JSON_PATH"
 
 python3 - "$DISABLED_DOCTOR_JSON_PATH" <<'PY'
 import json
@@ -123,12 +124,12 @@ assert "OPENCODE_SERVER_HOST=127.0.0.1" in monitor_row["details"], monitor_row
 print("doctor local-only monitor warning test passed")
 PY
 
-DOCTOR_HUMAN_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor "$TEST_PROJECT")"
+DOCTOR_HUMAN_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --no-strict "$TEST_PROJECT")"
 [[ "$DOCTOR_HUMAN_OUTPUT" == *"gaeta doctor"* ]]
 [[ "$DOCTOR_HUMAN_OUTPUT" == *"summary:"* ]]
 [[ "$DOCTOR_HUMAN_OUTPUT" != *"Dependencies"* ]]
 
-DOCTOR_VERBOSE_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --verbose "$TEST_PROJECT")"
+DOCTOR_VERBOSE_OUTPUT="$(HOME="$TEST_HOME" OPENCODE_BIN=/bin/true GAETA_DOCTOR_SKIP_SANDBOX=1 "$GAETA_BIN" doctor --no-strict --verbose "$TEST_PROJECT")"
 [[ "$DOCTOR_VERBOSE_OUTPUT" == *"Dependencies"* ]]
 [[ "$DOCTOR_VERBOSE_OUTPUT" == *"Summary"* ]]
 
@@ -199,6 +200,11 @@ required = [
     "docs/.gaeta/status.md",
     "docs/.gaeta/checklist.md",
     "docs/.gaeta/backlog.md",
+    ".mcp.json.example",
+    ".gaeta/profile.json",
+    ".gaeta/profile.lock.json",
+    ".opencode/gaeta.generated.json",
+    ".opencode/gaeta-profile.md",
 ]
 for rel in required:
     path = project / rel
@@ -221,6 +227,8 @@ LEGACY_RESUME_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" resume --show "$TEST_PROJ
 
 HOME="$TEST_HOME" GAETA_TASKS_FORCE_FALLBACK=1 bash -lc "cd \"$TEST_PROJECT\" && \"$GAETA_BIN\" tasks sync"
 STATUS_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" status "$TEST_PROJECT")"
+PROFILE_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" profile "$TEST_PROJECT")"
+PROFILE_LIST_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" profile list)"
 GO_ONE_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
 GO_TWO_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
 GO_THREE_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
@@ -244,6 +252,9 @@ MD
 git -C "$TEST_PROJECT" add .
 git -C "$TEST_PROJECT" -c user.name=gaeta -c user.email=gaeta@example.com commit -m "advance" >/dev/null
 GO_HEAD_RESET_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" go "$TEST_PROJECT")"
+SERVE_START_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" serve "$TEST_PROJECT")"
+SERVE_STATUS_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" serve status "$TEST_PROJECT")"
+SERVE_STOP_OUTPUT="$(HOME="$TEST_HOME" "$GAETA_BIN" serve stop "$TEST_PROJECT")"
 HOME="$TEST_HOME" "$GAETA_BIN" pause "$TEST_PROJECT"
 BACKUP_PATH="$(HOME="$TEST_HOME" "$GAETA_BIN" backup "$TEST_PROJECT")"
 proposal_one="$(HOME="$TEST_HOME" "$GAETA_BIN" proposal create "$TEST_PROJECT" "Build a terminal todo list MVP")"
@@ -261,7 +272,7 @@ set -e
 [[ "$UNINIT_BACKUP_OUTPUT" == *"requires an initialized gaeta project"* ]]
 [[ "$UNINIT_BACKUP_OUTPUT" == *"gaeta init"* ]]
 
-python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" "$STATUS_OUTPUT" "$BACKUP_PATH" "$GO_ONE_OUTPUT" "$GO_TWO_OUTPUT" "$GO_THREE_OUTPUT" "$GO_SHOW_OUTPUT" "$GO_AGENT_OUTPUT" "$GO_RECOVER_OUTPUT" "$GO_POST_INIT_ONE" "$GO_POST_INIT_TWO" "$GO_HEAD_RESET_OUTPUT" <<'PY'
+python3 - "$TEST_PROJECT" "$proposal_one" "$proposal_two" "$REPO_ROOT" "$STATUS_OUTPUT" "$PROFILE_OUTPUT" "$PROFILE_LIST_OUTPUT" "$BACKUP_PATH" "$GO_ONE_OUTPUT" "$GO_TWO_OUTPUT" "$GO_THREE_OUTPUT" "$GO_SHOW_OUTPUT" "$GO_AGENT_OUTPUT" "$GO_RECOVER_OUTPUT" "$GO_POST_INIT_ONE" "$GO_POST_INIT_TWO" "$GO_HEAD_RESET_OUTPUT" "$SERVE_START_OUTPUT" "$SERVE_STATUS_OUTPUT" "$SERVE_STOP_OUTPUT" <<'PY'
 import json
 import pathlib
 import sys
@@ -271,16 +282,21 @@ proposal_one = pathlib.Path(sys.argv[2])
 proposal_two = pathlib.Path(sys.argv[3])
 repo_root = pathlib.Path(sys.argv[4])
 status_output = sys.argv[5]
-backup_dir = pathlib.Path(sys.argv[6])
-go_one_output = sys.argv[7]
-go_two_output = sys.argv[8]
-go_three_output = sys.argv[9]
-go_show_output = sys.argv[10]
-go_agent_output = sys.argv[11]
-go_recover_output = sys.argv[12]
-go_post_init_one = sys.argv[13]
-go_post_init_two = sys.argv[14]
-go_head_reset_output = sys.argv[15]
+profile_output = sys.argv[6]
+profile_list_output = sys.argv[7]
+backup_dir = pathlib.Path(sys.argv[8])
+go_one_output = sys.argv[9]
+go_two_output = sys.argv[10]
+go_three_output = sys.argv[11]
+go_show_output = sys.argv[12]
+go_agent_output = sys.argv[13]
+go_recover_output = sys.argv[14]
+go_post_init_one = sys.argv[15]
+go_post_init_two = sys.argv[16]
+go_head_reset_output = sys.argv[17]
+serve_start_output = sys.argv[18]
+serve_status_output = sys.argv[19]
+serve_stop_output = sys.argv[20]
 status_text = (project / "docs" / ".gaeta" / "status.md").read_text(encoding="utf-8")
 pause_text = (project / "docs" / ".gaeta" / "pause.md").read_text(encoding="utf-8")
 project_text = (project / "PROJECT.md").read_text(encoding="utf-8")
@@ -297,6 +313,10 @@ assert "phase: Phase X" in status_output, status_output
 assert "next step: Implement sync behavior." in status_output, status_output
 assert "blockers:" in status_output, status_output
 assert "- none" in status_output, status_output
+assert "active: recommended" in profile_output, profile_output
+assert "minimal" in profile_list_output, profile_list_output
+assert "recommended" in profile_list_output, profile_list_output
+assert "experimental" in profile_list_output, profile_list_output
 assert "selected role: plan" in go_one_output, go_one_output
 assert "next role in cycle: build" in go_one_output, go_one_output
 assert "selected role: build" in go_two_output, go_two_output
@@ -313,6 +333,11 @@ assert "selected role: build" in go_post_init_one, go_post_init_one
 assert "selected role: review" in go_post_init_two, go_post_init_two
 assert "selected role: plan" in go_head_reset_output, go_head_reset_output
 assert "rotation note: reset to plan because git HEAD changed." in go_head_reset_output, go_head_reset_output
+assert "status: running" in serve_start_output, serve_start_output
+assert "host: 127.0.0.1" in serve_start_output, serve_start_output
+assert "root: " + str(project / ".gaeta" / "artifacts") in serve_start_output, serve_start_output
+assert "gaeta serve" in serve_status_output, serve_status_output
+assert "status: stopped" in serve_stop_output, serve_stop_output
 
 cycle_payload = json.loads((project / ".gaeta" / "go-cycle.json").read_text(encoding="utf-8"))
 assert cycle_payload["schema_version"] == 1, cycle_payload
@@ -352,6 +377,13 @@ assert "Need tighter validation" in proposal_two_text, proposal_two_text
 commands_dir = repo_root / ".opencode" / "commands"
 agents_dir = repo_root / ".opencode" / "agents"
 expected = {
+    "brainstorm.md": "agent: plan",
+    "plan.md": "agent: plan",
+    "build.md": "agent: build",
+    "doctor.md": "agent: review",
+    "serve.md": "agent: build",
+    "design.md": "agent: build",
+    "handoff.md": "agent: plan",
     "pause.md": "agent: build",
     "go.md": "agent: plan",
     "review.md": "agent: review",
@@ -362,6 +394,9 @@ expected = {
 for name, marker in expected.items():
     text = (commands_dir / name).read_text(encoding="utf-8")
     assert marker in text, (name, marker)
+
+for name in ["pause.md", "go.md", "review.md", "evolve.md", "resume.md", "status.md", "doctor.md", "serve.md"]:
+    text = (commands_dir / name).read_text(encoding="utf-8")
     assert "~/.config/gaeta/bin/gaeta" in text, name
 
 evolve_text = (commands_dir / "evolve.md").read_text(encoding="utf-8")
@@ -400,6 +435,15 @@ assert "Projection safety matrix (gaeta policy)" in architecture_text, architect
 assert "mirror-only" in architecture_text, architecture_text
 assert "Linux/macOS portability notes" in architecture_text, architecture_text
 assert "GAETA_DOCTOR_SKIP_SANDBOX=1 ./gaeta doctor --verbose ." in architecture_text, architecture_text
+
+for rel in [
+    "docs/opencode-integration.md",
+    "docs/opencode-profiles.md",
+    "docs/opencode-plugins.md",
+    "docs/artifacts.md",
+]:
+    path = repo_root / rel
+    assert path.exists(), path
 
 project_text = (repo_root / "PROJECT.md").read_text(encoding="utf-8")
 assert "Linux/macOS portability notes are documented in `docs/architecture.md`." in project_text, project_text

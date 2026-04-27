@@ -52,6 +52,14 @@
 - [x] Document Fence sandbox adoption as a deferred wishlist item with explicit decision gates; keep current Linux backend unchanged.
 - [x] Add `docs/fence-wishlist.md` as a linkable one-page decision note for deferred Fence evaluation triggers/gates.
 - [ ] Investigate slow startup path for `gaeta` and add a profiling-based optimization plan (deferred, not planned now).
+- [x] Reframe gaeta as TUI-first distro: keep CLI as airlock (`gaeta`, `init`, `doctor`, `profile`, `serve`, `upgrade`) and keep legacy workflow commands as compatibility paths.
+- [x] Add profile metadata model with `minimal`, `recommended` (default), and `experimental` entries under `.gaeta/profile.json`.
+- [x] Extend `gaeta init` with `--profile` and scaffold `.mcp.json.example` plus `.gaeta/artifacts/index.html` defaults.
+- [x] Add `gaeta profile` (`show`, `list`, `set`) and `gaeta serve` (`start`, `status`, `stop`) command support.
+- [x] Harden `gaeta doctor` with `--strict` plus profile/ignore/mcp/secret/artifact/direnv safety checks.
+- [x] Add TUI command pack entries for `/brainstorm`, `/plan`, `/build`, `/doctor`, `/serve`, `/design`, and `/handoff`.
+- [x] Add docs for OpenCode integration, profiles, plugins, and artifacts serving.
+- [x] Expand tests/fixtures for profile defaults, serve lifecycle, strict doctor mode, and new command pack files.
 - [x] Add rotating `/go` kickoff flow (`plan -> build -> review`) for the next implementation slice.
 - [x] Make `/go` reset to `plan` after git HEAD changes and hide validation commands in user format.
 - [x] Add OpenCode slash-command pack: `/check`, `/doctor`, `/propose`, `/approve`, `/reject`, `/resume`.
@@ -87,6 +95,21 @@
 - [x] Add OpenCode Monitor plugin projection compatibility for `~/.config/opencode/plugin/` so monitor discovery works in gaeta sandbox sessions.
 - [x] Normalize slash-command launcher precedence to PATH-first (`gaeta` before `./gaeta`) and make `/pause` degrade gracefully when no launcher is found.
 - [x] Teach `plan` agent to emit operator-mediated `Perplexity Request` prompts when deep web research is needed, while keeping findings advisory.
+- [x] Add `gaeta profile sync` (`default`, `--dry-run`, `--install`) with curated plugin allowlist state and hard-block enforcement.
+- [x] Write profile runtime state lockfile under `.gaeta/profile.lock.json` plus OpenCode-visible generated profile context under `.opencode/`.
+- [x] Extend `gaeta status` cockpit output with profile/plugin/artifact/sem state and next command guidance.
+- [x] Extend `gaeta doctor` with profile sync freshness and lockfile/plugin mismatch checks.
+- [x] Update `/status`, `/doctor`, `/plan`, `/review`, and `/handoff` command templates for profile sync and sem visibility.
+- [x] Add tests for profile sync dry-run/install state, lockfile generation, profile boundaries, and TUI command content expectations.
+- [x] Make `gaeta init` run profile sync install flow by default, with explicit `--no-install` escape hatch.
+- [x] Add curated OpenCode plugin registry (`packs/opencode/plugins.json`) with verified spec/manual/executable install typing.
+- [x] Make `gaeta profile sync --install` merge verified curated plugin specs into project `opencode.json` `plugin` field while preserving existing entries.
+- [x] Add `gaeta profile sync --no-notify` and make notify projection opt-out while defaulting to enabled.
+- [x] Update profile lock schema to record expected ids, configured specs, manual pending ids, missing ids, optional skips, and blocked detections.
+- [x] Update doctor/status plumbing to consume new lock schema and warn when recommended profile is not fully projected.
+- [x] Make `gaeta doctor` strict-by-default (with `--no-strict` escape hatch) and include manual plugin install command suggestions in profile-sync warnings.
+- [x] Remove guessed `npm install -g <plugin-id>` hints for unresolved manual plugins; keep explicit unresolved guidance and only emit install commands when source is known.
+- [x] Promote `opencode-ignore` to verified auto-projected OpenCode plugin spec and keep `envsitter-guard`/`opencode-agents` manual until authoritative plugin-spec evidence is available.
 
 ## Current
 

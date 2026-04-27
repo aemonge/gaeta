@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "blocked": [
+    "google-ai-search",
+    "telegram-bot",
+    "swarm-plugin",
+    "agent-of-empires",
+    "devcontainers"
+  ],
+  "plugins": {
+    "ocx": {
+      "label": "OCX",
+      "profiles": [
+        "recommended",
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "executable",
+        "command": "ocx",
+        "auto_install": false
+      },
+      "notes": "External CLI. Must be installed separately."
+    },
+    "envsitter-guard": {
+      "label": "Envsitter Guard",
+      "profiles": [
+        "recommended",
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "manual"
+      },
+      "notes": "Plugin package spec is not verified; keep manual."
+    },
+    "opencode-ignore": {
+      "label": "Opencode Ignore",
+      "profiles": [
+        "recommended",
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "opencode-plugin",
+        "spec": "opencode-ignore"
+      }
+    },
+    "openspec": {
+      "label": "OpenSpec",
+      "profiles": [
+        "recommended",
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "opencode-plugin",
+        "spec": "opencode-plugin-openspec"
+      }
+    },
+    "plannotator": {
+      "label": "Plannotator",
+      "profiles": [
+        "recommended",
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "opencode-plugin",
+        "spec": "@plannotator/opencode"
+      }
+    },
+    "micode": {
+      "label": "Micode",
+      "profiles": [
+        "recommended",
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "opencode-plugin",
+        "spec": "micode"
+      }
+    },
+    "opencode-agents": {
+      "label": "Opencode Agents",
+      "profiles": [
+        "recommended",
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "manual"
+      },
+      "notes": "Not an OpenCode plugin[] npm package; treat as agent/config bundle managed outside plugin array."
+    },
+    "notify": {
+      "label": "Notify",
+      "profiles": [
+        "recommended",
+        "experimental"
+      ],
+      "optional": true,
+      "install": {
+        "type": "opencode-plugin",
+        "spec": "opencode-notify"
+      }
+    },
+    "opencode-browser": {
+      "label": "Opencode Browser",
+      "profiles": [
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "opencode-plugin",
+        "spec": "opencode-agent-browser"
+      }
+    },
+    "opencode-skills": {
+      "label": "Opencode Skills",
+      "profiles": [
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "manual"
+      },
+      "notes": "No verified npm plugin spec."
+    },
+    "froggy": {
+      "label": "Froggy",
+      "profiles": [
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "manual"
+      },
+      "notes": "No verified npm plugin spec."
+    },
+    "opencode-mem": {
+      "label": "Opencode Mem",
+      "profiles": [
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "opencode-plugin",
+        "spec": "opencode-mem"
+      }
+    },
+    "opencode-roadmap": {
+      "label": "Opencode Roadmap",
+      "profiles": [
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "manual"
+      },
+      "notes": "No verified npm plugin spec."
+    },
+    "opencode-sessions": {
+      "label": "Opencode Sessions",
+      "profiles": [
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "manual"
+      },
+      "notes": "No verified npm plugin spec."
+    },
+    "opencode-canvas": {
+      "label": "Opencode Canvas",
+      "profiles": [
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "manual"
+      },
+      "notes": "No verified npm plugin spec."
+    },
+    "opencode-agent-tmux": {
+      "label": "OpenCode Agent Tmux",
+      "profiles": [
+        "experimental"
+      ],
+      "optional": false,
+      "install": {
+        "type": "manual"
+      },
+      "notes": "No verified npm plugin spec."
+    }
+  }
+}

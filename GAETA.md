@@ -44,11 +44,18 @@ At session end:
 
 ## Operator Slash Commands
 
+- Explore ambiguity first: `/brainstorm`.
+- Turn approach into executable steps: `/plan`.
+- Execute approved slice: `/build` (or rotated `/go`).
 - Session resume: `/resume`.
 - Session snapshot: `/status`.
 - Session checkpoint: `/pause`.
 - Start the next rotated slice (`plan -> build -> review`): `/go`.
 - Implementation review and validation: `/review`.
+- Run diagnostics: `/doctor`.
+- Serve local artifacts: `/serve`.
+- Run design artifact flow: `/design`.
+- Prepare next-session checkpoint prompt: `/handoff`.
 - Agent/workflow evolution: `/evolve`.
 
 ## Operator Role Matrix
@@ -94,6 +101,12 @@ At session end:
 - Enable OpenCode HTTP mode with `server.hostname: "localhost"` in gaeta/OpenCode config so attach/browser flows work without exposing non-loopback interfaces.
 - Environment fallback remains supported: `OPENCODE_HTTP_ENABLED=true`.
 - Verify startup includes `HTTP server listening on http://localhost:<port>` before using monitor attach/browser actions.
+
+## Profile Sync Policy
+
+- Use `gaeta profile sync --dry-run` to preview curated plugin/profile runtime state.
+- Use `gaeta profile sync` to refresh `.gaeta/profile.lock.json` and `.opencode/gaeta-profile.*` runtime context.
+- Use `gaeta profile sync --install` only for explicit install sessions; gaeta never installs hard-blocked plugins and never installs arbitrary plugin names.
 
 ## Backup Policy
 

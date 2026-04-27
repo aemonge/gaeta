@@ -15,6 +15,8 @@ The target model is:
 - The wrapper preserves OpenCode compatibility instead of forking its internals.
 - Sandbox, policy, modes, agents, commands, plugins, and workflow conventions live under
   the gaeta namespace.
+- CLI is intentionally small (`gaeta`, `init`, `doctor`, `profile`, `serve`, `upgrade`).
+- Most workflow actions run inside OpenCode TUI slash commands.
 
 The goal is not "replace OpenCode". The goal is "compose a stricter, more opinionated
 operator layer around OpenCode".
@@ -24,7 +26,9 @@ operator layer around OpenCode".
 ```bash
 make build
 ./gaeta doctor .
-./gaeta init .
+./gaeta init --profile recommended .
+./gaeta profile .
+./gaeta serve .
 ./gaeta go --show --format user .
 ```
 
@@ -107,6 +111,10 @@ Upstream monitor docs may reference `~/.config/opencode/config.json`; in gaeta w
 ## Deliverables in this pack
 
 - `docs/architecture.md` — system design, boundaries, config mapping, runtime model.
+- `docs/opencode-integration.md` — TUI-first boundary and authority model.
+- `docs/opencode-profiles.md` — minimal/recommended/experimental profile behavior.
+- `docs/opencode-plugins.md` — curated plugin table and security impact.
+- `docs/artifacts.md` — artifact layout and `gaeta serve` lifecycle.
 - `docs/implementation-plan.md` — phased build plan.
 - `docs/decisions.md` — ADR-style decision log.
 - `docs/.gaeta/checklist.md` — Markdown checkbox workflow for task tracking.
